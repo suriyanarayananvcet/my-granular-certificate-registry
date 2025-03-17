@@ -62,18 +62,19 @@ class AllocatedStorageRecordBase(utils.ActiveRecord):
     )
     scr_allocation_id: int = Field(
         description="The unique ID of the SCR that has been allocated to this matched record.",
+        foreign_key="storagerecord.id",
     )
     sdr_allocation_id: int = Field(
         description="The unique ID of the SDR that has been allocated to this matched record.",
-    )
-    sdr_proportion: float = Field(
-        description="The proportion of the SDR that has been allocated to the linked SCR.",
+        foreign_key="storagerecord.id",
     )
     gc_allocation_id: int = Field(
         description="The unique ID of the cancelled GC Bundle that has been allocated to this matched record.",
+        foreign_key="granularcertificatebundle.id",
     )
     sdgc_allocation_id: int = Field(
         description="The unique ID of the SD-GC Bundle that has been issued against this matched record.",
+        foreign_key="granularcertificatebundle.id",
     )
 
 
