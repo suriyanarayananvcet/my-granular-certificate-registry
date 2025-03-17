@@ -12,7 +12,7 @@ class FlowType(str, Enum):
     DISCHARGING = "discharging"
 
 
-class StorageChargeDischargeRecordBase(utils.ActiveRecord):
+class StorageRecordBase(utils.ActiveRecord):
     device_id: int = Field(
         description="The unique ID of the Storage Device that is being charged or discharged.",
     )
@@ -54,20 +54,17 @@ class StorageChargeDischargeRecordBase(utils.ActiveRecord):
     efficiency_factor_interval_end: datetime.datetime | None = Field(
         description="The UTC datetime to which the Storage Device calculates its effective efficiency factor for this SCR/SDR.",
     )
-    is_deleted: bool = Field(default=False)
 
 
-class AllocatedChargeDischargeRecordBase(utils.ActiveRecord):
+class AllocatedStorageRecordBase(utils.ActiveRecord):
     device_id: int = Field(
         description="The unique ID of the Storage Device that is being charged or discharged.",
     )
     scr_allocation_id: int = Field(
         description="The unique ID of the SCR that has been allocated to this matched record.",
-        foreign_key="storagechargerecord.id",
     )
     sdr_allocation_id: int = Field(
         description="The unique ID of the SDR that has been allocated to this matched record.",
-        foreign_key="storagedischargerecord.id",
     )
     sdr_proportion: float = Field(
         description="The proportion of the SDR that has been allocated to the linked SCR.",
@@ -78,7 +75,6 @@ class AllocatedChargeDischargeRecordBase(utils.ActiveRecord):
     sdgc_allocation_id: int = Field(
         description="The unique ID of the SD-GC Bundle that has been issued against this matched record.",
     )
-    is_deleted: bool = Field(default=False)
 
 
 class StorageActionBase(utils.ActiveRecord):
@@ -134,8 +130,8 @@ class StorageActionResponse(StorageActionBase):
 
 
 class StorageRecordQueryResponse(StorageActionResponse):
-    filtered_records: Union[list[StorageChargeDischargeRecordBase], None]
+    filtered_records: Union[list[StorageRecordBase], None]
 
 
-class AllocatedChargeDischargeRecordQueryResponse(StorageActionResponse):
-    filtered_records: Union[list[AllocatedChargeDischargeRecordBase], None]
+class AllocatedStorageRecordQueryResponse(StorageActionResponse):
+    filtered_records: Union[list[AllocatedStorageRecordBase], None]

@@ -1,44 +1,60 @@
 from sqlmodel import Field
 
 from gc_registry.storage.schemas import (
+    AllocatedStorageRecordBase,
     StorageActionBase,
-    StorageChargeRecordBase,
-    StorageDischargeRecordBase,
+    StorageRecordBase,
 )
 
 
-class StorageChargeRecord(StorageChargeRecordBase, table=True):
-    scr_allocation_id: int = Field(
-        description="The unique ID of the Storage Charge Record that allocated the energy of the Storage Device to this SDR.",
+class StorageRecord(StorageRecordBase, table=True):
+    id: int | None = Field(
+        default=None,
+        description="A unique identifier for the device. Integers could be used for this purpose, alternaties include the GS1 codes currently used under EECS.",
         primary_key=True,
     )
     account_id: int = Field(
         foreign_key="account.id",
-        description="Each SCR is issued to a single unique production Account that its Storage Device is individually registered to.",
+        description="Each storage record is issued to a single unique production Account that its Storage Device is individually registered to.",
     )
     device_id: int = Field(
         foreign_key="device.id",
-        description="The Device ID of the Storage Device that is being charged.",
+        description="The Device ID of the Storage Device that is being charged or discharged.",
     )
+    is_deleted: bool = Field(default=False)
 
 
-class StorageDischargeRecord(StorageDischargeRecordBase, table=True):
+class AllocatedStorageRecord(AllocatedStorageRecordBase, table=True):
+    id: int | None = Field(
+        default=None,
+        description="A unique identifier for the device. Integers could be used for this purpose, alternaties include the GS1 codes currently used under EECS.",
+        primary_key=True,
+    )
+    account_id: int = Field(
+        foreign_key="account.id",
+        description="Each allocated storage record is issued to a single unique production Account that its Storage Device is individually registered to.",
+    )
+    device_id: int = Field(
+        foreign_key="device.id",
+        description="The Device ID of the Storage Device that is being charged or discharged.",
+    )
+    scr_allocation_id: int = Field(
+        description="The unique ID of the SCR that has been allocated to this matched record.",
+        foreign_key="storagerecord.id",
+    )
     sdr_allocation_id: int = Field(
-        description="The unique ID of this Storage Discharge Record.",
-        primary_key=True,
+        description="The unique ID of the SDR that has been allocated to this matched record.",
+        foreign_key="storagerecord.id",
     )
-    account_id: int = Field(
-        foreign_key="account.id",
-        description="Each SDR is issued to a single unique production Account that its Storage Device is individually registered to.",
+    gc_allocation_id: int = Field(
+        description="The unique ID of the cancelled GC Bundle that has been allocated to this matched record.",
+        foreign_key="granularcertificatebundle.id",
     )
-    device_id: int = Field(
-        foreign_key="device.id",
-        description="The Device ID of the Storage Device that is being charged.",
+    sdgc_allocation_id: int = Field(
+        description="The unique ID of the SD-GC Bundle that has been issued against this matched record.",
+        foreign_key="granularcertificatebundle.id",
     )
-    scr_allocation_id: int = Field(
-        description="The unique ID of the Storage Charge Record that allocated the energy charged into this Storage Device (adjusted for losses) to this SDR.",
-        foreign_key="storagechargerecord.scr_allocation_id",
-    )
+    is_deleted: bool = Field(default=False)
 
 
 class StorageAction(StorageActionBase, table=True):
