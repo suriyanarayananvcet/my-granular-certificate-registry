@@ -1,5 +1,6 @@
 import datetime
 from typing import Any
+
 import pandas as pd
 from esdbclient import EventStoreDBClient
 from fastapi import Depends
@@ -17,33 +18,54 @@ from gc_registry.core.models.base import (
 from gc_registry.core.services import create_bundle_hash
 from gc_registry.device.models import Device
 from gc_registry.storage.models import AllocatedStorageRecord, StorageRecord
-from gc_registry.storage.schemas import AllocatedStorageRecordBase, StorageRecordBase
+from gc_registry.storage.schemas import (
+    AllocatedStorageRecordBase,
+    StorageRecordBase,
+    StorageRecordSubmissionResponse,
+)
 
 
 def create_charge_records_from_metering_data(
     storage_records_df: pd.DataFrame,
-    write_session: Session = Depends(db.get_write_session),
-    read_session: Session = Depends(db.get_read_session),
-    esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
-) -> list[StorageRecord]:
+    write_session: Session,
+    read_session: Session,
+    esdb_client: EventStoreDBClient,
+) -> dict:
     """Create a Storage Charge Record from the specified metering data."""
 
     # Convert the storage records dataframe to the data model format
-    storage_records_df["flow_type"] = (
-        "discharging" if storage_records_df["flow_energy"] > 0 else "charging"
+    storage_records_df["flow_type"] = storage_records_df["flow_energy"].apply(
+        lambda x: "discharging" if x > 0 else "charging"
     )
-
+    storage_records_df["flow_energy"] = storage_records_df["flow_energy"].abs()
     # Create the storage records
-    storage_records = StorageRecord.create(
-        storage_records_df[StorageRecordBase.model_fields.keys()].to_dict(
-            orient="records"
-        ),
+    _ = StorageRecord.create(
+        storage_records_df.to_dict(orient="records"),
         write_session,
         read_session,
         esdb_client,
     )
 
-    return storage_records
+    # Calculate summary values
+    total_charge_energy = storage_records_df[
+        storage_records_df["flow_type"] == "charging"
+    ]["flow_energy"].sum()
+
+    total_discharge_energy = storage_records_df[
+        storage_records_df["flow_type"] == "discharging"
+    ]["flow_energy"].sum()
+
+    total_energy = storage_records_df["flow_energy"].sum()
+    total_records = len(storage_records_df)
+
+    # Create and return the response object properly
+    return {
+        "total_charge_energy": total_charge_energy,
+        "total_discharge_energy": total_discharge_energy,
+        "total_energy": total_energy,
+        "total_records": total_records,
+        "message": "Storage records created successfully.",
+    }
 
 
 def create_allocated_storage_records_from_submitted_data(
@@ -76,38 +98,54 @@ def create_allocated_storage_records_from_submitted_data(
         validator_storage_record_ids,
         read_session,
     )
-    validator_storage_records_df = pd.DataFrame(validator_storage_records)
+    validator_storage_records_df = pd.DataFrame(
+        [record.model_dump() for record in validator_storage_records]
+    )
 
     # Assert that the referenced GC bundle IDs exist and have been cancelled
-    gc_bundle_ids = allocated_storage_records_df["gc_allocation_id"].unique()
-    gc_bundles_ids_in_db = read_session.exec(
-        select(GranularCertificateBundle.id).where(
-            GranularCertificateBundle.id.in_(gc_bundle_ids)
-            & GranularCertificateBundle.status
-            == CertificateStatus.CANCELLED
-        )
-    ).all()
+    allocated_storage_records_df["gc_allocation_id"] = [
+        int(id) if id != "" else None
+        for id in allocated_storage_records_df["gc_allocation_id"]
+    ]
+    allocated_storage_records_df["sdgc_allocation_id"] = [
+        int(id) if id != "" else None
+        for id in allocated_storage_records_df["sdgc_allocation_id"]
+    ]
+    gc_bundle_ids = allocated_storage_records_df["gc_allocation_id"].dropna().unique()
 
-    gc_bundle_ids_not_in_db = set(gc_bundle_ids) - set(gc_bundles_ids_in_db)
-    if len(gc_bundle_ids_not_in_db) > 0:
-        raise ValueError(
-            f"One or more specified GC bundle IDs do not exist or have not been cancelled: {gc_bundle_ids_not_in_db}"
-        )
+    # If no allocation IDs are provided, skip for now
+    if len(gc_bundle_ids) != 0:
+        gc_bundles_ids_in_db = read_session.exec(
+            select(GranularCertificateBundle.id).where(
+                GranularCertificateBundle.id.in_(gc_bundle_ids),
+                GranularCertificateBundle.certificate_bundle_status
+                == CertificateStatus.CANCELLED,
+            )
+        ).all()
+
+        gc_bundle_ids_not_in_db = set(gc_bundle_ids) - set(gc_bundles_ids_in_db)
+        if len(gc_bundle_ids_not_in_db) > 0:
+            raise ValueError(
+                f"One or more specified GC bundle IDs do not exist or have not been cancelled: {gc_bundle_ids_not_in_db}"
+            )
 
     # Iterate through allocation records in the submission and verify that each
     # validator ID has a corresponding storage record
     updated_sdr_ids = []
     updated_scr_ids = []
     for _idx, allocation_record in allocated_storage_records_df.iterrows():
-        scr = validator_storage_records_df.loc[
-            validator_storage_records_df["id"] == allocation_record["scr_allocation_id"]
-        ]
-        sdr = validator_storage_records_df.loc[
+        sdr_mask = (
             validator_storage_records_df["id"] == allocation_record["sdr_allocation_id"]
-        ]
-        if len(sdr) != 1 or len(scr) != 1:
+        )
+        scr_mask = (
+            validator_storage_records_df["id"] == allocation_record["scr_allocation_id"]
+        )
+        if sdr_mask.sum() > 1 or scr_mask.sum() > 1:
             raise ValueError(f"Multiple storage records found for the specified allocation IDs: \
                                 {allocation_record['sdr_allocation_id']} and {allocation_record['scr_allocation_id']}")
+
+        sdr = validator_storage_records_df.loc[allocation_record["sdr_allocation_id"]]
+        scr = validator_storage_records_df.loc[allocation_record["scr_allocation_id"]]
 
         validate_allocated_records(allocation_record, sdr, scr)
 
@@ -118,11 +156,22 @@ def create_allocated_storage_records_from_submitted_data(
     allocated_storage_records_df["sdr_allocation_id"] = updated_sdr_ids
     allocated_storage_records_df["scr_allocation_id"] = updated_scr_ids
 
+    # Convert NaN values to None for integer fields before creating records
+    if "gc_allocation_id" in allocated_storage_records_df.columns:
+        allocated_storage_records_df["gc_allocation_id"] = allocated_storage_records_df[
+            "gc_allocation_id"
+        ].where(pd.notna(allocated_storage_records_df["gc_allocation_id"]), None)
+
+    if "sdgc_allocation_id" in allocated_storage_records_df.columns:
+        allocated_storage_records_df["sdgc_allocation_id"] = (
+            allocated_storage_records_df[
+                "sdgc_allocation_id"
+            ].where(pd.notna(allocated_storage_records_df["sdgc_allocation_id"]), None)
+        )
+
     # Create the allocated storage records
     allocated_storage_records = AllocatedStorageRecord.create(
-        allocated_storage_records_df[
-            AllocatedStorageRecordBase.model_fields.keys()
-        ].to_dict(orient="records"),
+        allocated_storage_records_df.to_dict(orient="records"),
         write_session,
         read_session,
         esdb_client,
@@ -138,13 +187,11 @@ def validate_allocated_records(
         raise ValueError(f"Invalid flow types for the specified allocation IDs : \
                             {allocation_record['sdr_allocation_id']} and {allocation_record['scr_allocation_id']}")
 
-    if sdr["flow_start_datetime"] > scr["flow_start_datetime"]:
-        raise ValueError(f"SDR flow start datetime is after SCR flow start datetime: \
+    if sdr["flow_start_datetime"] < scr["flow_end_datetime"]:
+        raise ValueError(f"SDR flow start datetime is after SCR flow end datetime: \
                             {allocation_record['sdr_allocation_id']} and {allocation_record['scr_allocation_id']}")
 
-    if sdr["flow_end_datetime"] < scr["flow_end_datetime"]:
-        raise ValueError(f"SDR flow end datetime is before SCR flow end datetime: \
-                            {allocation_record['sdr_allocation_id']} and {allocation_record['scr_allocation_id']}")
+    # TODO add validation that cancelled GC Bundle quantities and datetimes match the referenced SCR
 
 
 def issue_sdgcs_against_allocated_records(
@@ -178,9 +225,9 @@ def issue_sdgcs_against_allocated_records(
         select(GranularCertificateBundle).where(
             GranularCertificateBundle.id.in_(
                 [record.gc_allocation_id for record in allocated_storage_records]
-            )
-            & GranularCertificateBundle.status
-            == CertificateStatus.CANCELLED
+            ),
+            GranularCertificateBundle.certificate_bundle_status
+            == CertificateStatus.CANCELLED,
         )
     ).all()
 

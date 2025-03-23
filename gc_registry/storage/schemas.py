@@ -2,6 +2,7 @@ import datetime
 from enum import Enum
 from typing import Union
 
+from pydantic import BaseModel
 from sqlmodel import Field
 
 from gc_registry import utils
@@ -146,3 +147,16 @@ class StorageRecordQueryResponse(StorageActionResponse):
 
 class AllocatedStorageRecordQueryResponse(StorageActionResponse):
     filtered_records: Union[list[AllocatedStorageRecordBase], None]
+
+
+class StorageRecordSubmissionResponse(BaseModel):
+    total_charge_energy: float
+    total_discharge_energy: float
+    total_energy: float
+    total_records: int
+    message: str
+
+
+class AllocatedStorageRecordSubmissionResponse(BaseModel):
+    total_records: int
+    message: str

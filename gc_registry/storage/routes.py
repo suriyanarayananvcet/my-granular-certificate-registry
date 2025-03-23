@@ -9,9 +9,6 @@ from sqlmodel import Session, select
 
 from gc_registry.authentication.services import get_current_user
 from gc_registry.certificate.models import GranularCertificateBundle
-from gc_registry.certificate.schemas import (
-    GranularCertificateBundleCreate,
-)
 from gc_registry.core.database import db, events
 from gc_registry.core.models.base import UserRoles
 from gc_registry.device.models import Device
@@ -22,9 +19,11 @@ from gc_registry.storage.models import (
     StorageRecord,
 )
 from gc_registry.storage.schemas import (
+    AllocatedStorageRecordSubmissionResponse,
     StorageActionResponse,
     StorageRecordBase,
     StorageRecordQueryResponse,
+    StorageRecordSubmissionResponse,
 )
 from gc_registry.storage.services import (
     create_allocated_storage_records_from_submitted_data,
@@ -84,7 +83,7 @@ def get_storage_allocation_template(current_user: User = Depends(get_current_use
 
 @router.post(
     "/submit_storage_records",
-    response_model=list[StorageRecord],
+    response_model=StorageRecordSubmissionResponse,
     status_code=201,
 )
 async def submit_storage_records(
@@ -94,11 +93,12 @@ async def submit_storage_records(
     write_session: Session = Depends(db.get_write_session),
     read_session: Session = Depends(db.get_read_session),
     esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
-):
+) -> StorageRecordSubmissionResponse:
     """Submit a list of Storage Records to the registry."""
 
     # Can be performed by both Storage Device owners and Storage Validators
-    validate_user_role(current_user, required_role=UserRoles.PRODUCTION_USER)
+    if current_user.role != UserRoles.STORAGE_VALIDATOR:
+        validate_user_role(current_user, required_role=UserRoles.PRODUCTION_USER)
 
     try:
         # Read the uploaded file
@@ -122,9 +122,8 @@ async def submit_storage_records(
         validate_user_access(current_user, device.account_id, read_session)
 
         # Create the storage records
-        storage_records = create_charge_records_from_metering_data(
+        storage_submission_response = create_charge_records_from_metering_data(
             storage_records_df,
-            current_user,
             write_session,
             read_session,
             esdb_client,
@@ -132,12 +131,12 @@ async def submit_storage_records(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    return storage_records
+    return StorageRecordSubmissionResponse(**storage_submission_response)
 
 
 @router.post(
     "/submit_allocation_records",
-    response_model=list[AllocatedStorageRecord],
+    response_model=AllocatedStorageRecordSubmissionResponse,
     status_code=201,
 )
 async def create_storage_allocation(
@@ -147,7 +146,7 @@ async def create_storage_allocation(
     write_session: Session = Depends(db.get_write_session),
     read_session: Session = Depends(db.get_read_session),
     esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
-):
+) -> AllocatedStorageRecordSubmissionResponse:
     """Storage Validator Only: Submit a list of Allocated Storage Records to the registry.
 
     This endpoint depends on there being existing validated Storage Charge/Discharge Records
@@ -160,8 +159,10 @@ async def create_storage_allocation(
         contents = await file.read()
         csv_file = io.StringIO(contents.decode("utf-8"))
 
-        # Convert to DataFrame
-        allocated_storage_records_df = pd.read_csv(csv_file)
+        # Convert to DataFrame and replace NaN values with None
+        allocated_storage_records_df = pd.read_csv(
+            csv_file, na_values=pd.NA, keep_default_na=False
+        )
         allocated_storage_records_df["device_id"] = deviceID
 
         # Check that the device ID is associated with an account that the user has access to
@@ -180,7 +181,6 @@ async def create_storage_allocation(
         allocated_storage_records = (
             create_allocated_storage_records_from_submitted_data(
                 allocated_storage_records_df,
-                current_user,
                 write_session,
                 read_session,
                 esdb_client,
@@ -189,7 +189,10 @@ async def create_storage_allocation(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    return allocated_storage_records
+    return AllocatedStorageRecordSubmissionResponse(
+        total_records=len(allocated_storage_records),
+        message="Allocation records created successfully.",
+    )
 
 
 @router.post(
