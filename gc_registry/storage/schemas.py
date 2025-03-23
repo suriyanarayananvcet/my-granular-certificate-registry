@@ -14,7 +14,8 @@ class FlowType(str, Enum):
 
 class StorageRecordBase(utils.ActiveRecord):
     device_id: int = Field(
-        description="The unique ID of the Storage Device that is being charged or discharged.",
+        description="The Device ID of the Storage Device that is being charged or discharged.",
+        foreign_key="device.id",
     )
     flow_type: FlowType = Field(
         description="The type of flow, either 'charging' or 'discharging'.",
@@ -28,37 +29,19 @@ class StorageRecordBase(utils.ActiveRecord):
     flow_energy: float = Field(
         description="The quantity of energy in Watt-hours (Wh) that the Storage Device has charged or discharged.",
     )
-    flow_energy_source: str = Field(
+    flow_energy_source: str | None = Field(
         description="The energy source from which the Storage Device was charged or discharged, matching the energy source of the GC Bundles \
                        that were cancelled and allocated to the Storage Device."
     )
-    gc_issuance_id: int | None = Field(
-        description="The unique issuance ID of the GC or SD-GC Bundle that was cancelled and allocated to this SCR/SDR.",
-    )
-    certificate_bundle_id_range_start: int | None = Field(
-        description="The start range ID of the GC Bundle that was cancelled and allocated to this SCR/SDR.",
-    )
-    certificate_bundle_id_range_end: int | None = Field(
-        description="The end range ID of the GC Bundle that was cancelled and allocated to this SCR/SDR.",
-    )
-    scr_allocation_methodology: str | None = Field(
-        description="The method by which the energy of the Storage Device was allocated to this SCR/SDR, for example: FIFO, LIFO, weighted average, or Storage Operator's discretion.",
-    )
-    efficiency_factor_methodology: str | None = Field(
-        description="The method by which the energy storage losses of the Storage Device were calculated.",
-    )
-    efficiency_factor_interval_start: datetime.datetime | None = Field(
-        description="""The UTC datetime from which the Storage Device calculates its effective efficiency factor for this SCR/SDR, based on total input and
-                       output energy over the interval specified. This field describes only the method proposed in the EnergyTag Standard, and is not mandatory.""",
-    )
-    efficiency_factor_interval_end: datetime.datetime | None = Field(
-        description="The UTC datetime to which the Storage Device calculates its effective efficiency factor for this SCR/SDR.",
+    validator_id: int | None = Field(
+        description="An optional ID provided by the Storage Validator party to reference this Storage Charge/Discharge Record.",
     )
 
 
 class AllocatedStorageRecordBase(utils.ActiveRecord):
     device_id: int = Field(
-        description="The unique ID of the Storage Device that is being charged or discharged.",
+        description="The Device ID of the Storage Device that is being charged or discharged.",
+        foreign_key="device.id",
     )
     scr_allocation_id: int = Field(
         description="The unique ID of the SCR that has been allocated to this matched record.",
@@ -68,14 +51,41 @@ class AllocatedStorageRecordBase(utils.ActiveRecord):
         description="The unique ID of the SDR that has been allocated to this matched record.",
         foreign_key="storagerecord.id",
     )
-    gc_allocation_id: int = Field(
+    sdr_proportion: float = Field(
+        description="The proportion of the SDR that has been allocated to the linked SCR",
+        ge=0.0,
+        le=1.0,
+    )
+    scr_allocation_methodology: str = Field(
+        description="The method by which the energy of the Storage Device was allocated to this SCR/SDR, for example: FIFO, LIFO, weighted average, or Storage Operator's discretion.",
+    )
+    gc_allocation_id: int | None = Field(
         description="The unique ID of the cancelled GC Bundle that has been allocated to this matched record.",
         foreign_key="granularcertificatebundle.id",
     )
-    sdgc_allocation_id: int = Field(
+    sdgc_allocation_id: int | None = Field(
         description="The unique ID of the SD-GC Bundle that has been issued against this matched record.",
         foreign_key="granularcertificatebundle.id",
     )
+    efficiency_factor_methodology: str = Field(
+        description="The method by which the energy storage losses of the Storage Device were calculated.",
+    )
+    efficiency_factor_interval_start: datetime.datetime = Field(
+        description="""The UTC datetime from which the Storage Device calculates its effective efficiency factor for this SCR/SDR, based on total input and
+                       output energy over the interval specified. This field describes only the method proposed in the EnergyTag Standard, and is not mandatory.""",
+    )
+    efficiency_factor_interval_end: datetime.datetime = Field(
+        description="The UTC datetime to which the Storage Device calculates its effective efficiency factor for this SCR/SDR.",
+    )
+    storage_efficiency_factor: float = Field(
+        description="The efficiency factor of the Storage Device applied to this SCR/SDR.",
+        ge=0.0,
+        le=1.0,
+    )
+
+
+class AllocatedStorageRecordCreate(AllocatedStorageRecordBase):
+    pass
 
 
 class StorageActionBase(utils.ActiveRecord):

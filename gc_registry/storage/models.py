@@ -1,4 +1,6 @@
-from sqlmodel import Field
+from typing import Self
+
+from sqlmodel import Field, Session, select
 
 from gc_registry.storage.schemas import (
     AllocatedStorageRecordBase,
@@ -10,49 +12,35 @@ from gc_registry.storage.schemas import (
 class StorageRecord(StorageRecordBase, table=True):
     id: int | None = Field(
         default=None,
-        description="A unique identifier for the device. Integers could be used for this purpose, alternaties include the GS1 codes currently used under EECS.",
+        description="A unique identifier for this Storage Record.",
         primary_key=True,
     )
-    account_id: int = Field(
-        foreign_key="account.id",
-        description="Each storage record is issued to a single unique production Account that its Storage Device is individually registered to.",
-    )
-    device_id: int = Field(
-        foreign_key="device.id",
-        description="The Device ID of the Storage Device that is being charged or discharged.",
-    )
     is_deleted: bool = Field(default=False)
+
+    @classmethod
+    def validator_ids_by_device_id(
+        cls, device_id: int, read_session: Session
+    ) -> list[int]:
+        """Retrieve all validator IDs for the specified device."""
+        return read_session.exec(
+            select(cls.validator_id).where(cls.device_id == device_id)
+        ).all()
+
+    @classmethod
+    def by_validator_ids(
+        cls, validator_ids: list[int], read_session: Session
+    ) -> list[Self]:
+        """Retrieve all Storage Records with the specified validator IDs."""
+        return read_session.exec(
+            select(cls).where(cls.validator_id.in_(validator_ids))
+        ).all()
 
 
 class AllocatedStorageRecord(AllocatedStorageRecordBase, table=True):
     id: int | None = Field(
         default=None,
-        description="A unique identifier for the device. Integers could be used for this purpose, alternaties include the GS1 codes currently used under EECS.",
+        description="A unique identifier for this Allocated Storage Record.",
         primary_key=True,
-    )
-    account_id: int = Field(
-        foreign_key="account.id",
-        description="Each allocated storage record is issued to a single unique production Account that its Storage Device is individually registered to.",
-    )
-    device_id: int = Field(
-        foreign_key="device.id",
-        description="The Device ID of the Storage Device that is being charged or discharged.",
-    )
-    scr_allocation_id: int = Field(
-        description="The unique ID of the SCR that has been allocated to this matched record.",
-        foreign_key="storagerecord.id",
-    )
-    sdr_allocation_id: int = Field(
-        description="The unique ID of the SDR that has been allocated to this matched record.",
-        foreign_key="storagerecord.id",
-    )
-    gc_allocation_id: int = Field(
-        description="The unique ID of the cancelled GC Bundle that has been allocated to this matched record.",
-        foreign_key="granularcertificatebundle.id",
-    )
-    sdgc_allocation_id: int = Field(
-        description="The unique ID of the SD-GC Bundle that has been issued against this matched record.",
-        foreign_key="granularcertificatebundle.id",
     )
     is_deleted: bool = Field(default=False)
 
