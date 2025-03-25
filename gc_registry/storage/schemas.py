@@ -18,8 +18,8 @@ class StorageRecordBase(utils.ActiveRecord):
         description="The Device ID of the Storage Device that is being charged or discharged.",
         foreign_key="device.id",
     )
-    flow_type: FlowType = Field(
-        description="The type of flow, either 'charging' or 'discharging'.",
+    is_charging: bool = Field(
+        description="Specifies whether the Storage Device is being charged or discharged.",
     )
     flow_start_datetime: datetime.datetime = Field(
         description="The UTC datetime at which the Storage Device began charging or discharging energy.",
@@ -29,10 +29,6 @@ class StorageRecordBase(utils.ActiveRecord):
     )
     flow_energy: float = Field(
         description="The quantity of energy in Watt-hours (Wh) that the Storage Device has charged or discharged.",
-    )
-    flow_energy_source: str | None = Field(
-        description="The energy source from which the Storage Device was charged or discharged, matching the energy source of the GC Bundles \
-                       that were cancelled and allocated to the Storage Device."
     )
     validator_id: int | None = Field(
         description="An optional ID provided by the Storage Validator party to reference this Storage Charge/Discharge Record.",

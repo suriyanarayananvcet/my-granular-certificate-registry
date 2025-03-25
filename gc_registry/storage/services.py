@@ -34,8 +34,8 @@ def create_charge_records_from_metering_data(
     """Create a Storage Charge Record from the specified metering data."""
 
     # Convert the storage records dataframe to the data model format
-    storage_records_df["flow_type"] = storage_records_df["flow_energy"].apply(
-        lambda x: "discharging" if x > 0 else "charging"
+    storage_records_df["is_charging"] = storage_records_df["flow_energy"].apply(
+        lambda x: False if x > 0 else True
     )
     storage_records_df["flow_energy"] = storage_records_df["flow_energy"].abs()
     # Create the storage records
@@ -47,12 +47,12 @@ def create_charge_records_from_metering_data(
     )
 
     # Calculate summary values
-    total_charge_energy = storage_records_df[
-        storage_records_df["flow_type"] == "charging"
-    ]["flow_energy"].sum()
+    total_charge_energy = storage_records_df[storage_records_df["is_charging"] == True][
+        "flow_energy"
+    ].sum()
 
     total_discharge_energy = storage_records_df[
-        storage_records_df["flow_type"] == "discharging"
+        storage_records_df["is_charging"] == False
     ]["flow_energy"].sum()
 
     total_energy = storage_records_df["flow_energy"].sum()
@@ -183,7 +183,7 @@ def create_allocated_storage_records_from_submitted_data(
 def validate_allocated_records(
     allocation_record: pd.Series, sdr: pd.Series, scr: pd.Series
 ):
-    if sdr["flow_type"] != "discharging" or scr["flow_type"] != "charging":
+    if (sdr["is_charging"] == True) or (scr["is_charging"] == False):
         raise ValueError(f"Invalid flow types for the specified allocation IDs : \
                             {allocation_record['sdr_allocation_id']} and {allocation_record['scr_allocation_id']}")
 
