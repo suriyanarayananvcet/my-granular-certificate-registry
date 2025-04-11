@@ -7,7 +7,7 @@ from gc_registry.account.models import Account, AccountWhitelistLink
 from gc_registry.authentication.services import get_password_hash
 from gc_registry.certificate.models import GranularCertificateBundle, IssuanceMetaData
 from gc_registry.certificate.services import (
-    issue_certificates_so_integration_for_all_devices_in_date_range,
+    issue_certificates_metering_integration_for_all_devices_in_date_range,
 )
 from gc_registry.core.database import cqrs, db, events
 from gc_registry.core.models.base import (
@@ -298,6 +298,6 @@ def seed_all_generators_and_certificates_from_elexon(
 
     metering_client = ElexonClient()
 
-    issue_certificates_so_integration_for_all_devices_in_date_range(
+    issue_certificates_metering_integration_for_all_devices_in_date_range(
         from_datetime, to_datetime, metering_client
     )
