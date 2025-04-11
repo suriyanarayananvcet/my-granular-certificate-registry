@@ -261,7 +261,12 @@ def issue_certificates_by_device_in_date_range(
         logger.error(err_msg)
         raise ValueError(err_msg)
 
-    if from_datetime.tzinfo != pytz.UTC or to_datetime.tzinfo != pytz.UTC:
+    if (
+        from_datetime.tzinfo != pytz.UTC
+        and from_datetime.tzinfo != datetime.timezone.utc
+    ) or (
+        to_datetime.tzinfo != pytz.UTC and to_datetime.tzinfo != datetime.timezone.utc
+    ):
         err_msg = "from_datetime and to_datetime must be in UTC"
         logger.error(err_msg)
         raise ValueError(err_msg)
