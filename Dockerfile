@@ -29,9 +29,8 @@ RUN bash -c "if [ $INSTALL_DEV == 'true' ] ; then poetry install --no-root ; els
 
 ENV PYTHONPATH=/code
 
-COPY ./setup.py ./setup.py
 COPY ./gc_registry ./gc_registry/
-COPY ./.env ./.env
+# COPY .env ./.env
 COPY ./README.md ./README.md
 COPY ./Makefile ./Makefile
 COPY ./alembic.ini ./alembic.ini

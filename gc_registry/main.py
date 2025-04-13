@@ -125,6 +125,8 @@ origins = [
     "http://localhost:8000",
     "https://frontend-dot-rich-store-445612-c6.ew.r.appspot.com",
     "https://api-dot-rich-store-445612-c6.ew.r.appspot.com",
+    "https://api-640576971908.us-east1.run.app",
+    "https://api-ciatlb2uvq-ue.a.run.app",
 ]
 
 app.add_middleware(

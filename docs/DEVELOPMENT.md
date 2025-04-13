@@ -196,3 +196,31 @@ This uses GCP kubernetes engine
 
 4. Restart Deployment: Apply changes and restart the pods `kubectl rollout restart deployment eventstore -n default`
 
+## Cloud Run setup and deployment
+
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com
+
+### Build and deploy
+gcloud run deploy api --source .
+
+### Export config
+gcloud run services describe api --format export > api_service.yaml
+
+### Update config
+gcloud run services replace api_service.yaml
+
+
+### Get logs
+gcloud builds list --limit=5
+gcloud builds log 5b6cf1f8-ff5a-4a58-b44c-eda84841e7f8
+
+
+### Grant secrets access
+
+1. First, find your service account
+gcloud run services describe api --region us-east1 --format="value(serviceAccountEmail)"
+
+2. Then grant it the Secret Manager Secret Accessor role
+gcloud projects add-iam-policy-binding rich-store-445612-c6 --member="serviceAccount:YOUR_SERVICE_ACCOUNT_EMAIL" --role="roles/secretmanager.secretAccessor"
+
+
