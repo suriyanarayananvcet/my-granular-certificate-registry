@@ -4,17 +4,27 @@ import os
 from google.cloud import secretmanager
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
-def get_secret(secret_name: str) -> str:
+def get_secret(secret_name: str) -> str | None:
     """
     Fetches a secret from Google Cloud Secret Manager.
     """
-    client = secretmanager.SecretManagerServiceClient()
-    project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
-    secret_path = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
-    response = client.access_secret_version(name=secret_path)
-    return response.payload.data.decode("UTF-8")
-
+    try:
+        client = secretmanager.SecretManagerServiceClient()
+        project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+        if not project_id:
+            logging.error(f"GOOGLE_CLOUD_PROJECT environment variable not set")
+            return None
+            
+        secret_path = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
+        logging.info(f"Attempting to access secret: {secret_name}")
+        response = client.access_secret_version(name=secret_path)
+        secret_value = response.payload.data.decode("UTF-8")
+        
+        logging.info(f"Successfully retrieved secret: {secret_name}")
+        return secret_value
+    except Exception as e:
+        logging.error(f"Error fetching secret {secret_name}: {e}")
+        return None
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -58,7 +68,7 @@ class Settings(BaseSettings):
                 self.JWT_ALGORITHM = get_secret("JWT_ALGORITHM")
                 self.MIDDLEWARE_SECRET_KEY = get_secret("MIDDLEWARE_SECRET_KEY")
             except Exception as e:
-                logging.warning(f"Error fetching secret: {e}")
+                logging.error(f"Error fetching secret: {e}")
 
 
 settings = Settings()
