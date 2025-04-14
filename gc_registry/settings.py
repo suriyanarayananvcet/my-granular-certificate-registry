@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     # Define all secrets as optional initially
     DATABASE_HOST_READ: str | None = None
     DATABASE_HOST_WRITE: str | None = None
+    GCP_INSTANCE_READ: str | None = None
+    GCP_INSTANCE_WRITE: str | None = None
     POSTGRES_USER: str | None = None
     POSTGRES_PASSWORD: str | None = None
     ESDB_CONNECTION_STRING: str | None = None
@@ -60,6 +62,8 @@ class Settings(BaseSettings):
             try:
                 self.DATABASE_HOST_READ = get_secret("DATABASE_HOST_READ")
                 self.DATABASE_HOST_WRITE = get_secret("DATABASE_HOST_WRITE")
+                self.GCP_INSTANCE_READ = get_secret("GCP_INSTANCE_READ")
+                self.GCP_INSTANCE_WRITE = get_secret("GCP_INSTANCE_WRITE")
                 self.POSTGRES_USER = get_secret("POSTGRES_USER")
                 self.POSTGRES_PASSWORD = get_secret("POSTGRES_PASSWORD")
                 self.ESDB_CONNECTION_STRING = get_secret("ESDB_CONNECTION_STRING")
