@@ -200,14 +200,32 @@ This uses GCP kubernetes engine
 
 gcloud services enable run.googleapis.com cloudbuild.googleapis.com
 
-### Build and deploy
+### Basic method for deploy
+1. Build and deploy
 gcloud run deploy api --source .
 
-### Export config
+2. Export config
 gcloud run services describe api --format export > api_service.yaml
 
-### Update config
+### Update config from yaml
 gcloud run services replace api_service.yaml
+
+### Build and push container methods
+
+# 1. Build the Docker image
+docker build -t us-east1-docker.pkg.dev/rich-store-445612-c6/cloud-run-source-deploy/api:latest .
+
+# 2. Authenticate Docker to your Google Cloud registry
+gcloud auth configure-docker us-east1-docker.pkg.dev
+
+# 3. Push the image to the registry
+docker push us-east1-docker.pkg.dev/rich-store-445612-c6/cloud-run-source-deploy/api:latest
+
+### Build and push in one command
+gcloud builds submit --tag us-east1-docker.pkg.dev/rich-store-445612-c6/cloud-run-source-deploy/api:latest
+
+### Deploy version from image
+gcloud run deploy api --image us-east1-docker.pkg.dev/rich-store-445612-c6/cloud-run-source-deploy/api:latest --region us-east1 --platform managed
 
 
 ### Get logs
@@ -222,5 +240,14 @@ gcloud run services describe api --region us-east1 --format="value(serviceAccoun
 
 2. Then grant it the Secret Manager Secret Accessor role
 gcloud projects add-iam-policy-binding rich-store-445612-c6 --member="serviceAccount:YOUR_SERVICE_ACCOUNT_EMAIL" --role="roles/secretmanager.secretAccessor"
+
+
+### Local IP whitelist
+gcloud sql instances patch rich-store-445612-c6:us-east1:registry-read-us-east1 --project=rich-store-445612-c6 --authorized-networks=82.40.248.15/32
+
+### Cloud run access to SQL
+gcloud run services update api --add-cloudsql-instances=rich-store-445612-c6:us-east1:registry-read-us-east1
+
+
 
 
