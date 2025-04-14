@@ -286,7 +286,6 @@ def issue_sdgcs_against_allocated_records(
         sdr_records_df=sdr_records_df,
         account_id=account_id,
         device=device,
-        is_storage=True,
         certificate_bundle_id_range_start=max_certificate_bundle_id + 1,
     )
 
@@ -303,7 +302,6 @@ def map_allocation_to_certificates(
     sdr_records_df: pd.DataFrame,
     account_id: int,
     device: Device,
-    is_storage: bool,
     certificate_bundle_id_range_start: int = 0,
 ) -> list[dict[str, Any]]:
     mapped_data: list = []
