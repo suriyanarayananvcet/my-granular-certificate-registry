@@ -17,11 +17,11 @@ from gc_registry.core.database import db, events
 from gc_registry.core.models.base import UserRoles
 from gc_registry.user.models import User, UserAccountLink
 from gc_registry.user.schemas import (
+    CreateTestAccount,
+    CreateTestAccountResponse,
     UserCreate,
     UserRead,
     UserUpdate,
-    WebinarSignup,
-    WebinarSignupResponse,
 )
 from gc_registry.user.validation import validate_user_role
 
@@ -147,14 +147,14 @@ def change_role(
     return user.update(role_update, write_session, read_session, esdb_client)
 
 
-@router.post("/create_webinar_signup")
-def create_webinar_signup(
-    webinar_signup: WebinarSignup,
+@router.post("/create_test_account")
+def create_test_account(
+    webinar_signup: CreateTestAccount,
     current_user: User = Depends(get_current_active_admin),
     write_session: Session = Depends(db.get_write_session),
     read_session: Session = Depends(db.get_read_session),
     esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
-) -> WebinarSignupResponse:
+) -> CreateTestAccountResponse:
     """For internal use only.
 
     Given a user who has signed up post-webinar for a test account, perform the following actions:
@@ -227,7 +227,7 @@ def create_webinar_signup(
         white_list_link_dict_send, write_session, read_session, esdb_client
     )
 
-    return WebinarSignupResponse(
+    return CreateTestAccountResponse(
         user=UserRead.model_validate(user.model_dump()),
         account=AccountRead.model_validate(account.model_dump()),
         password=random_password,

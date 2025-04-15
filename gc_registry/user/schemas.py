@@ -71,13 +71,13 @@ class UserRead(BaseModel):
         }
 
 
-class WebinarSignup(BaseModel):
+class CreateTestAccount(BaseModel):
     email: str
     name: str
     organisation: str
 
 
-class WebinarSignupResponse(BaseModel):
+class CreateTestAccountResponse(BaseModel):
     user: UserRead
     account: AccountRead
     password: str
