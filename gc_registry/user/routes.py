@@ -1,9 +1,9 @@
 import secrets
-from typing import Annotated
+from typing import Annotated, cast
 
 from esdbclient import EventStoreDBClient
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from gc_registry.account.models import Account, AccountWhitelistLink
 from gc_registry.account.schemas import AccountRead
@@ -178,17 +178,25 @@ def create_webinar_signup(
         role=UserRoles.PRODUCTION_USER,
     )
 
-    user = User.create(user_base, write_session, read_session, esdb_client)[0]
+    _user = User.create(user_base, write_session, read_session, esdb_client)
+    if _user is not None:
+        user: User = cast(User, _user[0])
 
     # Create a new empty account for the user
     account_dict = {
         "account_name": f"{webinar_signup.name}'s Account",
         "user_ids": [user.id],
     }
-    account = Account.create(account_dict, write_session, read_session, esdb_client)[0]
+    _account = Account.create(account_dict, write_session, read_session, esdb_client)
+    if _account is not None:
+        account: Account = cast(Account, _account[0])
 
     # Retrieve the central test account
-    central_test_account = Account.by_name("Test Account", read_session)
+    _central_test_account = read_session.exec(
+        select(Account).where(Account.account_name == "Test Account")
+    ).first()
+    if _central_test_account is not None:
+        central_test_account: Account = cast(Account, _central_test_account)
 
     # Link the user to both their own account and the central test account
     user_account_link_dict_own = {"user_id": user.id, "account_id": account.id}
@@ -220,7 +228,7 @@ def create_webinar_signup(
     )
 
     return WebinarSignupResponse(
-        user=user,
-        account=account,
+        user=UserRead.model_validate(user.model_dump()),
+        account=AccountRead.model_validate(account.model_dump()),
         password=random_password,
     )
