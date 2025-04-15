@@ -4,6 +4,7 @@ import os
 from google.cloud import secretmanager
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 def get_secret(secret_name: str) -> str | None:
     """
     Fetches a secret from Google Cloud Secret Manager.
@@ -12,19 +13,20 @@ def get_secret(secret_name: str) -> str | None:
         client = secretmanager.SecretManagerServiceClient()
         project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
         if not project_id:
-            logging.error(f"GOOGLE_CLOUD_PROJECT environment variable not set")
+            logging.error("GOOGLE_CLOUD_PROJECT environment variable not set")
             return None
-            
+
         secret_path = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
         logging.info(f"Attempting to access secret: {secret_name}")
         response = client.access_secret_version(name=secret_path)
         secret_value = response.payload.data.decode("UTF-8")
-        
+
         logging.info(f"Successfully retrieved secret: {secret_name}")
         return secret_value
     except Exception as e:
         logging.error(f"Error fetching secret {secret_name}: {e}")
         return None
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

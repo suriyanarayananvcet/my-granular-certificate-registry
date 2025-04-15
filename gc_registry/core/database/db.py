@@ -1,4 +1,3 @@
-import logging
 from typing import Any, Generator
 
 from sqlmodel import Session, SQLModel, create_engine
@@ -48,17 +47,15 @@ class DButils:
         self._db_test_fp = db_test_fp
         self._gcp_instance = gcp_instance
 
-        
         if test:
             self.connection_str = f"sqlite:///{self._db_test_fp}"
         else:
             self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@{self._db_host}:{self._db_port}/{self._db_name}"
-        
+
         if settings.ENVIRONMENT == "PROD":
             socket_path = f"/cloudsql/{self._gcp_instance}"
             self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@/{self._db_name}?host={socket_path}"
 
-            
         self.engine = create_engine(
             self.connection_str,
             pool_pre_ping=True,
@@ -90,8 +87,8 @@ def get_db_name_to_client():
 
     if db_name_to_client == {}:
         db_mapping = [
-            ("db_read", settings.DATABASE_HOST_READ,settings.GCP_INSTANCE_READ),
-            ("db_write", settings.DATABASE_HOST_WRITE,settings.GCP_INSTANCE_WRITE),
+            ("db_read", settings.DATABASE_HOST_READ, settings.GCP_INSTANCE_READ),
+            ("db_write", settings.DATABASE_HOST_WRITE, settings.GCP_INSTANCE_WRITE),
         ]
 
         for db_name, db_host, gcp_instance in db_mapping:
