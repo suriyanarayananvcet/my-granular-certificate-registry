@@ -1,6 +1,6 @@
 import React from "react";
 import { Modal, Typography, Divider, Space } from "antd";
-import StatusTag from "../common/StatusTag";
+import StatusTag from "../Common/StatusTag";
 
 const { Text } = Typography;
 
