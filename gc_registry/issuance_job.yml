@@ -6,19 +6,12 @@ metadata:
   labels:
     cloud.googleapis.com/location: us-east1
   annotations:
-    run.googleapis.com/client-name: cloud-console
     run.googleapis.com/cloudsql-instances: rich-store-445612-c6:us-east1:registry-read-us-east1,rich-store-445612-c6:us-east1:registry-write-us-east-1
-    run.googleapis.com/vpc-access-connector: registry-vpc
-    run.googleapis.com/vpc-access-egress: all-traffic
 spec:
   template:
     metadata:
       annotations:
-        run.googleapis.com/client-name: cloud-console
-        run.googleapis.com/execution-environment: gen2
         run.googleapis.com/cloudsql-instances: rich-store-445612-c6:us-east1:registry-read-us-east1,rich-store-445612-c6:us-east1:registry-write-us-east-1
-        run.googleapis.com/vpc-access-connector: registry-vpc
-        run.googleapis.com/vpc-access-egress: all-traffic
     spec:
       taskCount: 1
       template:
@@ -34,8 +27,18 @@ spec:
             - "/bin/bash"
             - "-c"
             args:
-            - /code/gc_registry/issuance-task.sh
-
+            - |
+              echo "Checking script permissions..."
+              ls -la /code/gc_registry/issuance-task.sh
+              
+              echo "Making script executable..."
+              chmod +x /code/gc_registry/issuance-task.sh
+              
+              echo "Checking Cloud SQL connectivity..."
+              ls -la /cloudsql/ || echo "Cloud SQL directory not found"
+              
+              echo "Running issuance task..."
+              /code/gc_registry/issuance-task.sh
             env:
             - name: ENVIRONMENT
               value: PROD
