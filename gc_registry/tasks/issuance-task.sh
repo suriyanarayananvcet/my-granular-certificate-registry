@@ -19,9 +19,30 @@ echo "======================= SETTING UP LOG DIRECTORY ======================="
 mkdir -p /code/logs
 echo "Log directory created at /code/logs"
 
+# Check for date parameters in environment variables
+echo "======================= CHECKING PARAMETERS ======================="
+FROM_DATE=${FROM_DATE:-""}
+TO_DATE=${TO_DATE:-""}
+
+DATE_PARAMS=""
+if [ ! -z "$FROM_DATE" ]; then
+  DATE_PARAMS="$DATE_PARAMS --from_date $FROM_DATE"
+  echo "Using custom from_date: $FROM_DATE"
+fi
+
+if [ ! -z "$TO_DATE" ]; then
+  DATE_PARAMS="$DATE_PARAMS --to_date $TO_DATE"
+  echo "Using custom to_date: $TO_DATE"
+fi
+
+if [ -z "$DATE_PARAMS" ]; then
+  echo "Using default date range (yesterday to today)"
+fi
+
 # Run the actual task
 echo "======================= RUNNING CERTIFICATE ISSUANCE TASK ======================="
-/usr/local/bin/poetry run python gc_registry/certificate/issuance_task.py
+echo "Running with parameters: $DATE_PARAMS"
+/usr/local/bin/poetry run python gc_registry/certificate/issuance_task.py $DATE_PARAMS
 
 # Check exit code
 EXIT_CODE=$?

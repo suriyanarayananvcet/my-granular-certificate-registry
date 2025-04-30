@@ -6,12 +6,18 @@ metadata:
   labels:
     cloud.googleapis.com/location: us-east1
   annotations:
+    run.googleapis.com/client-name: cloud-console
     run.googleapis.com/cloudsql-instances: rich-store-445612-c6:us-east1:registry-read-us-east1,rich-store-445612-c6:us-east1:registry-write-us-east-1
+    run.googleapis.com/vpc-access-connector: registry-vpc
+    run.googleapis.com/vpc-access-egress: private-ranges-only
 spec:
   template:
     metadata:
       annotations:
+        run.googleapis.com/client-name: cloud-console
         run.googleapis.com/cloudsql-instances: rich-store-445612-c6:us-east1:registry-read-us-east1,rich-store-445612-c6:us-east1:registry-write-us-east-1
+        run.googleapis.com/vpc-access-connector: registry-vpc
+        run.googleapis.com/vpc-access-egress: private-ranges-only
     spec:
       taskCount: 1
       template:
@@ -28,17 +34,11 @@ spec:
             - "-c"
             args:
             - |
-              echo "Checking script permissions..."
-              ls -la /code/gc_registry/issuance-task.sh
+              # Make sure script is executable
+              chmod +x /code/gc_registry/tasks/issuance-task.sh
               
-              echo "Making script executable..."
-              chmod +x /code/gc_registry/issuance-task.sh
-              
-              echo "Checking Cloud SQL connectivity..."
-              ls -la /cloudsql/ || echo "Cloud SQL directory not found"
-              
-              echo "Running issuance task..."
-              /code/gc_registry/issuance-task.sh
+              # Run the script
+              /code/gc_registry/tasks/issuance-task.sh
             env:
             - name: ENVIRONMENT
               value: PROD
@@ -48,6 +48,10 @@ spec:
               value: https://frontend-640576971908.us-east1.run.app
             - name: PYTHONUNBUFFERED
               value: "1"
+            - name: FROM_DATE
+              value: ""
+            - name: TO_DATE
+              value: ""
           maxRetries: 1
-          timeoutSeconds: '600'
+          timeoutSeconds: '2000'
           serviceAccountName: 640576971908-compute@developer.gserviceaccount.com
