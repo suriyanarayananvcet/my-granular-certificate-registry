@@ -12,8 +12,9 @@ Arguments:
 
 import argparse
 import datetime
-import pytz
 import sys
+
+import pytz
 
 from gc_registry.certificate.services import (
     issue_certificates_metering_integration_for_all_devices_in_date_range,
@@ -34,7 +35,6 @@ def parse_date(date_str):
 def issue_for_all_generators_and_certificates_from_elexon(from_date=None, to_date=None):
     """
     Issue certificates for all generators and certificates from Elexon.
-    
     Args:
         from_date: Optional start datetime. Defaults to yesterday at 23:00 UTC.
         to_date: Optional end datetime. Defaults to today at 00:00 UTC.
@@ -46,17 +46,17 @@ def issue_for_all_generators_and_certificates_from_elexon(from_date=None, to_dat
         )
     else:
         to_datetime = to_date
-    
+
     # Default from_date is yesterday at 23:00 UTC (1 hour before midnight)
     if from_date is None:
         from_datetime = to_datetime - datetime.timedelta(days=1, hours=1)
     else:
         from_datetime = from_date
-    
+
     print(f"Issuing certificates from {from_datetime} to {to_datetime}")
-    
+
     metering_client = ElexonClient()
-    
+
     issue_certificates_metering_integration_for_all_devices_in_date_range(
         from_datetime, to_datetime, metering_client
     )
@@ -65,19 +65,17 @@ def issue_for_all_generators_and_certificates_from_elexon(from_date=None, to_dat
 def main():
     parser = argparse.ArgumentParser(description="Certificate Issuance Task")
     parser.add_argument(
-        "--from_date", 
-        help="Start date in YYYY-MM-DD format. Defaults to yesterday."
+        "--from_date", help="Start date in YYYY-MM-DD format. Defaults to yesterday."
     )
     parser.add_argument(
-        "--to_date", 
-        help="End date in YYYY-MM-DD format. Defaults to today."
+        "--to_date", help="End date in YYYY-MM-DD format. Defaults to today."
     )
-    
+
     args = parser.parse_args()
-    
+
     from_date = parse_date(args.from_date) if args.from_date else None
     to_date = parse_date(args.to_date) if args.to_date else None
-    
+
     issue_for_all_generators_and_certificates_from_elexon(from_date, to_date)
 
 
