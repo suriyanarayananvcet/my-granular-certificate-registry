@@ -43,6 +43,16 @@ def create_user(
 ):
     validate_user_role(current_user, required_role=UserRoles.ADMIN)
     user_base.hashed_password = get_password_hash(user_base.password)
+
+    existing_user = read_session.exec(
+        select(User).where(User.email == user_base.email)
+    ).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"User with email {user_base.email} already exists.",
+        )
+
     user = User.create(user_base, write_session, read_session, esdb_client)
 
     return user
@@ -167,6 +177,15 @@ def create_test_account(
     Returns the user and account details, as well as the password to be returned to the user.
     """
 
+    existing_user = read_session.exec(
+        select(User).where(User.email == webinar_signup.email)
+    ).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"User with email {webinar_signup.email} already exists.",
+        )
+
     # Create a random password for the user
     random_password = secrets.token_urlsafe(12)
 
@@ -175,6 +194,7 @@ def create_test_account(
         name=webinar_signup.name,
         organisation=webinar_signup.organisation,
         password=random_password,
+        hashed_password=get_password_hash(random_password),
         role=UserRoles.PRODUCTION_USER,
     )
 
