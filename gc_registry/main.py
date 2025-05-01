@@ -129,6 +129,7 @@ origins = [
     "https://api-640576971908.us-east1.run.app",  # cloud run
     "https://frontend-ciatlb2uvq-ue.a.run.app",  # cloud run
     "https://api-ciatlb2uvq-ue.a.run.app",  # cloud run
+    "https://demo-registry.energytag.org",
 ]
 
 app.add_middleware(

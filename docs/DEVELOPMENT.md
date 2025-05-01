@@ -193,10 +193,10 @@ gcloud auth configure-docker us-east1-docker.pkg.dev
 # 3. Push the image to the registry
 docker push us-east1-docker.pkg.dev/rich-store-445612-c6/cloud-run-source-deploy/api:latest
 
-### Build and push in one command
+### Build and push in one command (preferred method)
 gcloud builds submit --tag us-east1-docker.pkg.dev/rich-store-445612-c6/cloud-run-source-deploy/api:latest
 
-### Deploy version from image
+### Deploy version from image (preferred method)
 gcloud run deploy api --image us-east1-docker.pkg.dev/rich-store-445612-c6/cloud-run-source-deploy/api:latest --region us-east1 --platform managed
 
 
