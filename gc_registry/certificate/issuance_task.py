@@ -49,7 +49,7 @@ def issue_for_all_generators_and_certificates_from_elexon(from_date=None, to_dat
 
     # Default from_date is yesterday at 23:00 UTC (1 hour before midnight)
     if from_date is None:
-        from_datetime = to_datetime - datetime.timedelta(days=1, hours=1)
+        from_datetime = to_datetime - datetime.timedelta(days=15, hours=1)
     else:
         from_datetime = from_date
 
