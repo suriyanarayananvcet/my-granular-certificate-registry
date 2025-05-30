@@ -23,6 +23,10 @@ from gc_registry.storage.schemas import (
     StorageRecordBase,
     StorageRecordSubmissionResponse,
 )
+from gc_registry.storage.validation import (
+    validate_allocated_records,
+    validate_allocated_records_against_gc_bundles,
+)
 
 
 def create_charge_records_from_metering_data(
@@ -47,13 +51,13 @@ def create_charge_records_from_metering_data(
     )
 
     # Calculate summary values
-    total_charge_energy = storage_records_df[storage_records_df["is_charging"] == True][
+    total_charge_energy = storage_records_df[storage_records_df["is_charging"]][
         "flow_energy"
     ].sum()
 
-    total_discharge_energy = storage_records_df[
-        storage_records_df["is_charging"] == False
-    ]["flow_energy"].sum()
+    total_discharge_energy = storage_records_df[~storage_records_df["is_charging"]][
+        "flow_energy"
+    ].sum()
 
     total_energy = storage_records_df["flow_energy"].sum()
     total_records = len(storage_records_df)
@@ -77,7 +81,8 @@ def create_allocated_storage_records_from_submitted_data(
     """Storage Validator Only: Create a list of Allocated Storage Records from the specified submitted data.
 
     Relies on there being existing validated Storage Charge/Discharge Records for the specified device that include
-    validator IDs to match the Allocated Storage Records against."""
+    validator IDs to match the Allocated Storage Records against.
+    """
 
     # Validate that existing Storage Charge/Discharge Records exist for each allocation entry
     device_ids = allocated_storage_records_df["device_id"].unique()
@@ -180,20 +185,6 @@ def create_allocated_storage_records_from_submitted_data(
     return allocated_storage_records
 
 
-def validate_allocated_records(
-    allocation_record: pd.Series, sdr: pd.Series, scr: pd.Series
-):
-    if (sdr["is_charging"] == True) or (scr["is_charging"] == False):
-        raise ValueError(f"Invalid flow types for the specified allocation IDs : \
-                            {allocation_record['sdr_allocation_id']} and {allocation_record['scr_allocation_id']}")
-
-    if sdr["flow_start_datetime"] < scr["flow_end_datetime"]:
-        raise ValueError(f"SDR flow start datetime is after SCR flow end datetime: \
-                            {allocation_record['sdr_allocation_id']} and {allocation_record['scr_allocation_id']}")
-
-    # TODO add validation that cancelled GC Bundle quantities and datetimes match the referenced SCR
-
-
 def issue_sdgcs_against_allocated_records(
     allocated_storage_record_ids: list[int],
     device: Device,
@@ -239,6 +230,18 @@ def issue_sdgcs_against_allocated_records(
         raise ValueError(
             f"One or more specified GC bundle IDs do not exist or have not been cancelled: {missing_gc_bundle_ids}"
         )
+
+    # Retrieve the associated SCRs/SDRs for the allocated storage records
+    scr_ids = [record.scr_allocation_id for record in allocated_storage_records]
+    sdr_ids = [record.sdr_allocation_id for record in allocated_storage_records]
+    charge_records = read_session.exec(
+        select(StorageRecord).where(StorageRecord.id.in_(scr_ids + sdr_ids))
+    ).all()
+
+    # Validate that the GC Bundles have sufficient quantities and datetimes to cover the allocated storage records
+    validate_allocated_records_against_gc_bundles(
+        allocated_storage_records, charge_records, cancelled_gc_bundles
+    )
 
     # Update a copy of the retrieved GC Bundles with the storage-specific attributes to pass through to the SDGC
     sdgcs_to_issue = []
