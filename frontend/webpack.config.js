@@ -85,7 +85,7 @@ module.exports = {
 
   plugins: [
     new HtmlWebpackPlugin({
-      template: "./src/public/index.html",
+      template: "./public/index.html",
       minify: !isDevelopment && {
         collapseWhitespace: true,
         removeComments: true,
@@ -110,7 +110,7 @@ module.exports = {
     },
     historyApiFallback: true,
     compress: true,
-    port: 8080,
+    port: 8081,
     host: '0.0.0.0',
     open: true,
     hot: true,
