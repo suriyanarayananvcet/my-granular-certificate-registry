@@ -25,7 +25,7 @@ import DeviceRegisterDialog from "./DeviceRegisterForm.js";
 import DeviceUploadDialog from "./DeviceUploadDataForm.js";
 import Summary from "./Summary.js";
 
-import FilterTable from "../Common/FilterTable.js";
+import FilterTable from "../common/FilterTable.js";
 
 const { Option } = Select;
 const { Search } = Input;
