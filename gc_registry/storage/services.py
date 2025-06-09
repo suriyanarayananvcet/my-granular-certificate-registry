@@ -18,11 +18,6 @@ from gc_registry.core.models.base import (
 from gc_registry.core.services import create_bundle_hash
 from gc_registry.device.models import Device
 from gc_registry.storage.models import AllocatedStorageRecord, StorageRecord
-from gc_registry.storage.schemas import (
-    AllocatedStorageRecordBase,
-    StorageRecordBase,
-    StorageRecordSubmissionResponse,
-)
 from gc_registry.storage.validation import (
     validate_allocated_records,
     validate_allocated_records_against_gc_bundles,

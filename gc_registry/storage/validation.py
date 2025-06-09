@@ -63,6 +63,8 @@ def validate_allocated_records_against_gc_bundles(
             None,
         )
 
+        assert sdr_record # REMOVE after complete
+
         if not gc_bundle:
             raise ValueError(
                 f"GC Bundle with ID {allocated_storage_record.gc_allocation_id} not found"
