@@ -202,6 +202,11 @@ app.add_middleware(
 app.add_middleware(SessionMiddleware, secret_key=settings.MIDDLEWARE_SECRET_KEY)
 
 
+# Register exception handlers
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(Exception, general_exception_handler)
+
 
 # Assemble fastapi loggers
 uvicorn_logger = logging.getLogger("uvicorn")
