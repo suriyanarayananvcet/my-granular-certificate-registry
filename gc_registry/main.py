@@ -17,6 +17,7 @@ from pyinstrument.renderers.html import HTMLRenderer
 from pyinstrument.renderers.speedscope import SpeedscopeRenderer
 from starlette.exceptions import HTTPException
 from starlette.middleware.sessions import SessionMiddleware
+from sqlalchemy import text
 
 from .account.routes import router as account_router
 from .authentication.routes import router as auth_router
@@ -88,7 +89,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             try:
                 # Test connection by creating a session
                 with client.get_session() as session:
-                    session.execute("SELECT 1")
+                    session.execute(text("SELECT 1"))
                 logger.info(f"Successfully connected to {db_name}")
             except Exception as e:
                 logger.error(f"Failed to connect to {db_name}: {str(e)}")
