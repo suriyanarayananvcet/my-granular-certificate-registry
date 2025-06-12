@@ -423,14 +423,9 @@ def test_query_certificate_bundles(
     assert response.status_code == 422
     assert response.json() == {
         "status_code": 422,
-        "message": "Validation error occurred",
-        "details": {
-            "body -> certificate_period_end": {
-                "message": "Difference between certificate_period_start and certificate_period_end must be 30 days or less.",
-                "type": "value_error",
-            }
-        },
-        "error_type": "validation_error",
+        "message": "Difference between certificate_period_start and certificate_period_end must be 30 days or less.",
+        "details": {},
+        "error_type": "http_error",
     }
 
     # Test case 7: Query certificates with issuance_ids and certificate_period_start and certificate_period_end
@@ -451,14 +446,9 @@ def test_query_certificate_bundles(
     assert response.status_code == 422
     assert response.json() == {
         "status_code": 422,
-        "message": "Validation error occurred",
-        "details": {
-            "body -> issuance_ids": {
-                "message": "Cannot provide issuance_ids with certificate_period_start or certificate_period_end.",
-                "type": "value_error",
-            }
-        },
-        "error_type": "validation_error",
+        "message": "Cannot provide issuance_ids with certificate_period_start or certificate_period_end.",
+        "details": {},
+        "error_type": "http_error",
     }
 
     # Test case 8: Query certificates with invalid certificate_period_start and certificate_period_end
@@ -481,9 +471,13 @@ def test_query_certificate_bundles(
         "message": "Validation error occurred",
         "details": {
             "body -> certificate_period_start": {
-                "message": "Input should be a valid datetime or date",
+                "message": "Input should be a valid datetime or date, invalid character in year",
                 "type": "datetime_from_date_parsing",
-            }
+            },
+            "body -> certificate_period_end": {
+                "message": "Input should be a valid datetime or date, invalid character in year",
+                "type": "datetime_from_date_parsing",
+            },
         },
         "error_type": "validation_error",
     }
@@ -504,14 +498,9 @@ def test_query_certificate_bundles(
     assert response.status_code == 422
     assert response.json() == {
         "status_code": 422,
-        "message": "Validation error occurred",
-        "details": {
-            "body -> certificate_period_end": {
-                "message": "certificate_period_end must be provided if certificate_period_start is more than 30 days ago.",
-                "type": "value_error",
-            }
-        },
-        "error_type": "validation_error",
+        "message": "certificate_period_end must be provided if certificate_period_start is more than 30 days ago.",
+        "details": {},
+        "error_type": "http_error",
     }
 
     # Test case 10: Try with period end, but no start date
@@ -530,14 +519,9 @@ def test_query_certificate_bundles(
     assert response.status_code == 422
     assert response.json() == {
         "status_code": 422,
-        "message": "Validation error occurred",
-        "details": {
-            "body -> certificate_period_start": {
-                "message": "certificate_period_end must be provided if certificate_period_end is provided.",
-                "type": "value_error",
-            }
-        },
-        "error_type": "validation_error",
+        "message": "certificate_period_start must be provided if certificate_period_end is provided.",
+        "details": {},
+        "error_type": "http_error",
     }
 
     # Test case 11: Try to query certificates with invalid energy_source
