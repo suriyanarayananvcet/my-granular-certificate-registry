@@ -167,16 +167,14 @@ def issuance_id_to_device_and_interval(
 def get_max_certificate_id_by_device_id(
     db_session: Session, device_id: int
 ) -> int | None:
-    """Gets the maximum certificate ID from any bundle for a given device, excluding any withdrawn certificates
+    """Gets the maximum certificate ID from any bundle for a given device, excluding any withdrawn certificates.
 
     Args:
         db_session (Session): The database session
         device_id (int): The device ID
 
     Returns:
-        int: The maximum certificate ID
-
-
+        int | None: The maximum certificate ID
     """
 
     stmt: SelectOfScalar = select(
@@ -913,9 +911,9 @@ def claim_certificates(
 
     # Assert the certificates are in a cancelled state
     for certificate in certificates_bundles_to_claim:
-        assert (
-            certificate.certificate_bundle_status == CertificateStatus.CANCELLED
-        ), f"Certificate with ID {certificate.issuance_id} is not cancelled and cannot be claimed"
+        assert certificate.certificate_bundle_status == CertificateStatus.CANCELLED, (
+            f"Certificate with ID {certificate.issuance_id} is not cancelled and cannot be claimed"
+        )
 
         certificate_update = GranularCertificateBundleUpdate(
             certificate_bundle_status=CertificateStatus.CLAIMED
