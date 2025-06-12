@@ -80,21 +80,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Starting up application...")
 
     try:
-        # Initialize database connections
-        logger.info("Initializing database connections...")
-        db_clients = get_db_name_to_client()
-
-        # Test database connections
-        for db_name, client in db_clients.items():
-            try:
-                # Test connection by creating a session
-                with client.get_session() as session:
-                    session.execute(text("SELECT 1"))
-                logger.info(f"Successfully connected to {db_name}")
-            except Exception as e:
-                logger.error(f"Failed to connect to {db_name}: {str(e)}")
-                raise
-
+        # TODO: Initialize database connections
         logger.info("Application startup complete")
         yield
 
@@ -106,14 +92,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Shutting down application...")
 
         try:
-            # Close database connections
-            for db_name, client in db_clients.items():
-                try:
-                    client.engine.dispose()
-                    logger.info(f"Successfully closed connection to {db_name}")
-                except Exception as e:
-                    logger.error(f"Error closing connection to {db_name}: {str(e)}")
-
+            # TODO: Close database connections
             logger.info("Application shutdown complete")
 
         except Exception as e:
