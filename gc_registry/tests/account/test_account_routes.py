@@ -34,9 +34,9 @@ class TestAccountRoutes:
         updated_whitelist_account_ids_from_db = [
             account["id"] for account in updated_whitelist_accounts_from_db.json()
         ]
-        assert (
-            updated_whitelist_account_ids_from_db == [fake_db_account_2.id]
-        ), f"Expected {[fake_db_account_2.id]} but got {updated_whitelist_account_ids_from_db}"
+        assert updated_whitelist_account_ids_from_db == [fake_db_account_2.id], (
+            f"Expected {[fake_db_account_2.id]} but got {updated_whitelist_account_ids_from_db}"
+        )
 
         # Test revoking access from the account
         updated_whitelist = AccountWhitelist(
@@ -57,9 +57,9 @@ class TestAccountRoutes:
             account["id"] for account in updated_whitelist_accounts_from_db.json()
         ]
 
-        assert (
-            updated_whitelist_account_ids_from_db == []
-        ), f"Expected '[]' but got {updated_whitelist_account_ids_from_db}"
+        assert updated_whitelist_account_ids_from_db == [], (
+            f"Expected '[]' but got {updated_whitelist_account_ids_from_db}"
+        )
 
         # Test adding an account that does not exist
         updated_whitelist = AccountWhitelist(add_to_whitelist=[999])  # type: ignore
@@ -71,7 +71,12 @@ class TestAccountRoutes:
         )
 
         assert response.status_code == 404
-        assert response.json() == {"detail": "Account ID to add not found: 999"}
+        assert response.json() == {
+            "details": {},
+            "error_type": "http_error",
+            "message": "Account ID to add not found: 999",
+            "status_code": 404,
+        }
 
         # Test adding an account to its own whitelist
         updated_whitelist = AccountWhitelist(add_to_whitelist=[fake_db_account.id])  # type: ignore
@@ -84,7 +89,10 @@ class TestAccountRoutes:
 
         assert _updated_whitelist_response.status_code == 400
         assert _updated_whitelist_response.json() == {
-            "detail": "Cannot add an account to its own whitelist."
+            "details": {},
+            "error_type": "http_error",
+            "message": "Cannot add an account to its own whitelist.",
+            "status_code": 400,
         }
 
     def test_get_all_devices_by_account_id(
@@ -120,8 +128,12 @@ class TestAccountRoutes:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code == 404
-        print(response.json())
-        assert response.json()["detail"] == f"Account with id {incorrect_id} not found"
+        assert response.json() == {
+            "details": {},
+            "error_type": "http_error",
+            "message": f"Account with id {incorrect_id} not found",
+            "status_code": 404,
+        }
 
     def test_get_account_summary(
         self,
@@ -155,7 +167,12 @@ class TestAccountRoutes:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code == 404
-        assert response.json()["detail"] == f"Account with id {fake_id} not found"
+        assert response.json() == {
+            "details": {},
+            "error_type": "http_error",
+            "message": f"Account with id {fake_id} not found",
+            "status_code": 404,
+        }
 
     def test_get_users_by_account_id(
         self,

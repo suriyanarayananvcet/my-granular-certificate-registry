@@ -19,7 +19,12 @@ class TestUserRoutes:
             "/user/me", headers={"Authorization": "Bearer invalid_token"}
         )
         assert res.status_code == 401
-        assert res.json()["detail"] == "Could not validate credentials"
+        assert res.json() == {
+            "message": "Could not validate credentials",
+            "details": {},
+            "status_code": 401,
+            "error_type": "http_error",
+        }
 
     def test_read_current_user_accounts(
         self,
