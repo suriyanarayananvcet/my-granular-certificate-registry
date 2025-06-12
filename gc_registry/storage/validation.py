@@ -8,12 +8,16 @@ def validate_allocated_records(
     allocation_record: pd.Series, sdr: pd.Series, scr: pd.Series
 ):
     if sdr["is_charging"] or not scr["is_charging"]:
-        raise ValueError(f"Invalid flow types for the specified allocation IDs : \
-                            {allocation_record['sdr_allocation_id']} and {allocation_record['scr_allocation_id']}")
+        raise ValueError(
+            f"Invalid flow types for the specified allocation IDs : \
+                            {allocation_record['sdr_allocation_id']} and {allocation_record['scr_allocation_id']}"
+        )
 
     if sdr["flow_start_datetime"] < scr["flow_end_datetime"]:
-        raise ValueError(f"SDR flow start datetime is after SCR flow end datetime: \
-                            {allocation_record['sdr_allocation_id']} and {allocation_record['scr_allocation_id']}")
+        raise ValueError(
+            f"SDR flow start datetime is after SCR flow end datetime: \
+                            {allocation_record['sdr_allocation_id']} and {allocation_record['scr_allocation_id']}"
+        )
 
     return
 
@@ -54,14 +58,14 @@ def validate_allocated_records_against_gc_bundles(
             None,
         )
 
-        sdr_record = next(
-            (
-                record
-                for record in charge_records
-                if record.id == allocated_storage_record.sdr_allocation_id
-            ),
-            None,
-        )
+        # sdr_record = next(
+        #     (
+        #         record
+        #         for record in charge_records
+        #         if record.id == allocated_storage_record.sdr_allocation_id
+        #     ),
+        #     None,
+        # )
 
         if not gc_bundle:
             raise ValueError(
@@ -69,19 +73,19 @@ def validate_allocated_records_against_gc_bundles(
             )
 
         if (
-            gc_bundle.quantity
+            gc_bundle.bundle_quantity
             != allocated_storage_record.sdr_proportion * scr_record.flow_energy
         ):
             raise ValueError(
                 f"GC Bundle with ID {allocated_storage_record.gc_allocation_id} does not have sufficient quantity"
             )
 
-        if gc_bundle.start_datetime < scr_record.flow_start_datetime:
+        if gc_bundle.production_starting_interval < scr_record.flow_start_datetime:
             raise ValueError(
                 f"GC Bundle with ID {allocated_storage_record.gc_allocation_id} does not have sufficient start datetime"
             )
 
-        if gc_bundle.end_datetime > scr_record.flow_end_datetime:
+        if gc_bundle.production_starting_interval > scr_record.flow_end_datetime:
             raise ValueError(
                 f"GC Bundle with ID {allocated_storage_record.gc_allocation_id} does not have sufficient end datetime"
             )

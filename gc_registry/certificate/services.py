@@ -510,7 +510,7 @@ def process_certificate_bundle_action(
         esdb_client (EventStoreDBClient): The EventStoreDB client
 
     Returns:
-        list[GranularCertificateAction]: The list of certificates processed
+        GranularCertificateAction: The certificate action processed
 
     """
 
@@ -538,19 +538,16 @@ def process_certificate_bundle_action(
         logger.error(err_msg)
         raise ValueError(err_msg)
 
-    # try:
     action_function: Callable[..., Any] = certificate_action_functions[
         valid_certificate_action.action_type
     ]
     action_function(certificate_action, write_session, read_session, esdb_client)
-    # except Exception as e:
-    #     logger.error(f"Error whilst processing certificate action: {str(e)}")
 
-    db_certificate_actions = GranularCertificateAction.create(
+    db_certificate_action = GranularCertificateAction.create(
         valid_certificate_action, write_session, read_session, esdb_client
     )
 
-    return db_certificate_actions[0]  # type: ignore
+    return db_certificate_action[0]  # type: ignore
 
 
 def apply_bundle_quantity_or_percentage(
@@ -911,9 +908,9 @@ def claim_certificates(
 
     # Assert the certificates are in a cancelled state
     for certificate in certificates_bundles_to_claim:
-        assert certificate.certificate_bundle_status == CertificateStatus.CANCELLED, (
-            f"Certificate with ID {certificate.issuance_id} is not cancelled and cannot be claimed"
-        )
+        assert (
+            certificate.certificate_bundle_status == CertificateStatus.CANCELLED
+        ), f"Certificate with ID {certificate.issuance_id} is not cancelled and cannot be claimed"
 
         certificate_update = GranularCertificateBundleUpdate(
             certificate_bundle_status=CertificateStatus.CLAIMED

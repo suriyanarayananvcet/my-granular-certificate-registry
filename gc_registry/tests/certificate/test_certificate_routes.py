@@ -358,9 +358,9 @@ def test_query_certificate_bundles(
         == fake_db_granular_certificate_bundle.bundle_quantity
         + fake_db_granular_certificate_bundle_2.bundle_quantity
     )
-    assert "id" in response.json()["granular_certificate_bundles"][0].keys(), (
-        "ID not in returned data"
-    )
+    assert (
+        "id" in response.json()["granular_certificate_bundles"][0].keys()
+    ), "ID not in returned data"
 
     # Test case 4: Query certificates with invalid issuance_ids
 

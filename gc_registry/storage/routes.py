@@ -162,7 +162,7 @@ async def create_storage_allocation(
         # Convert to DataFrame and replace NaN values with None
         allocated_storage_records_df = pd.read_csv(
             csv_file, na_values=pd.NA, keep_default_na=False
-        )
+        )  # type: ignore
         allocated_storage_records_df["device_id"] = deviceID
 
         # Check that the device ID is associated with an account that the user has access to

@@ -17,7 +17,6 @@ from pyinstrument.renderers.html import HTMLRenderer
 from pyinstrument.renderers.speedscope import SpeedscopeRenderer
 from starlette.exceptions import HTTPException
 from starlette.middleware.sessions import SessionMiddleware
-from sqlalchemy import text
 
 from .account.routes import router as account_router
 from .authentication.routes import router as auth_router

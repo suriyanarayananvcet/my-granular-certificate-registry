@@ -2,10 +2,8 @@ import io
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session, select
-from sqlmodel.sql.expression import SelectOfScalar
+from sqlmodel import Session
 
-from gc_registry.certificate.models import GranularCertificateBundle, IssuanceMetaData
 from gc_registry.device.models import Device
 
 
