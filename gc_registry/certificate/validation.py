@@ -50,7 +50,6 @@ def validate_granular_certificate_bundle(
         raw_granular_certificate_bundle
     )
 
-    # W_IN_MW = 1e6
     device_id = granular_certificate_bundle.device_id
 
     device_mw = get_device_capacity_by_id(db_session, device_id)

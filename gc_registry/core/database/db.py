@@ -76,7 +76,7 @@ class DButils:
 db_name_to_client: dict[str, Any] = {}
 
 
-def get_db_name_to_client():
+def get_db_name_to_client() -> dict[str, Any]:
     global db_name_to_client
 
     if db_name_to_client == {}:

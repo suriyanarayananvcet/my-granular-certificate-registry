@@ -167,16 +167,14 @@ def issuance_id_to_device_and_interval(
 def get_max_certificate_id_by_device_id(
     db_session: Session, device_id: int
 ) -> int | None:
-    """Gets the maximum certificate ID from any bundle for a given device, excluding any withdrawn certificates
+    """Gets the maximum certificate ID from any bundle for a given device, excluding any withdrawn certificates.
 
     Args:
         db_session (Session): The database session
         device_id (int): The device ID
 
     Returns:
-        int: The maximum certificate ID
-
-
+        int | None: The maximum certificate ID
     """
 
     stmt: SelectOfScalar = select(
@@ -512,7 +510,7 @@ def process_certificate_bundle_action(
         esdb_client (EventStoreDBClient): The EventStoreDB client
 
     Returns:
-        list[GranularCertificateAction]: The list of certificates processed
+        GranularCertificateAction: The certificate action processed
 
     """
 
@@ -540,19 +538,16 @@ def process_certificate_bundle_action(
         logger.error(err_msg)
         raise ValueError(err_msg)
 
-    # try:
     action_function: Callable[..., Any] = certificate_action_functions[
         valid_certificate_action.action_type
     ]
     action_function(certificate_action, write_session, read_session, esdb_client)
-    # except Exception as e:
-    #     logger.error(f"Error whilst processing certificate action: {str(e)}")
 
-    db_certificate_actions = GranularCertificateAction.create(
+    db_certificate_action = GranularCertificateAction.create(
         valid_certificate_action, write_session, read_session, esdb_client
     )
 
-    return db_certificate_actions[0]  # type: ignore
+    return db_certificate_action[0]  # type: ignore
 
 
 def apply_bundle_quantity_or_percentage(

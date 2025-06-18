@@ -6,7 +6,6 @@ from esdbclient import EventStoreDBClient
 from fastapi import Depends
 from sqlmodel import Session, select
 
-from gc_registry import settings
 from gc_registry.certificate.models import GranularCertificateBundle
 from gc_registry.certificate.services import get_max_certificate_id_by_device_id
 from gc_registry.core.database import db, events
@@ -17,12 +16,8 @@ from gc_registry.core.models.base import (
 )
 from gc_registry.core.services import create_bundle_hash
 from gc_registry.device.models import Device
+from gc_registry.settings import settings
 from gc_registry.storage.models import AllocatedStorageRecord, StorageRecord
-from gc_registry.storage.schemas import (
-    AllocatedStorageRecordBase,
-    StorageRecordBase,
-    StorageRecordSubmissionResponse,
-)
 from gc_registry.storage.validation import (
     validate_allocated_records,
     validate_allocated_records_against_gc_bundles,
@@ -146,8 +141,10 @@ def create_allocated_storage_records_from_submitted_data(
             validator_storage_records_df["id"] == allocation_record["scr_allocation_id"]
         )
         if sdr_mask.sum() > 1 or scr_mask.sum() > 1:
-            raise ValueError(f"Multiple storage records found for the specified allocation IDs: \
-                                {allocation_record['sdr_allocation_id']} and {allocation_record['scr_allocation_id']}")
+            raise ValueError(
+                f"Multiple storage records found for the specified allocation IDs: \
+                                {allocation_record['sdr_allocation_id']} and {allocation_record['scr_allocation_id']}"
+            )
 
         sdr = validator_storage_records_df.loc[allocation_record["sdr_allocation_id"]]
         scr = validator_storage_records_df.loc[allocation_record["scr_allocation_id"]]
@@ -169,9 +166,9 @@ def create_allocated_storage_records_from_submitted_data(
 
     if "sdgc_allocation_id" in allocated_storage_records_df.columns:
         allocated_storage_records_df["sdgc_allocation_id"] = (
-            allocated_storage_records_df[
-                "sdgc_allocation_id"
-            ].where(pd.notna(allocated_storage_records_df["sdgc_allocation_id"]), None)
+            allocated_storage_records_df["sdgc_allocation_id"].where(
+                pd.notna(allocated_storage_records_df["sdgc_allocation_id"]), None
+            )
         )
 
     # Create the allocated storage records
