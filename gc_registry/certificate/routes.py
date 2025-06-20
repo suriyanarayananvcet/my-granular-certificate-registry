@@ -143,15 +143,15 @@ def query_certificate_bundles_route(
             certificate_bundle_query, read_session
         )
 
-        if not certificate_bundles_from_query:
-            raise HTTPException(status_code=404, detail="No certificates found")
-
         query_dict = certificate_bundle_query.model_dump()
 
-        granular_certificate_bundles_read = [
-            GranularCertificateBundleRead.model_validate(certificate.model_dump())
-            for certificate in certificate_bundles_from_query
-        ]
+        if certificate_bundles_from_query is not None:
+            granular_certificate_bundles_read = [
+                GranularCertificateBundleRead.model_validate(certificate.model_dump())
+                for certificate in certificate_bundles_from_query
+            ]
+        else:
+            granular_certificate_bundles_read = []
 
         query_dict["granular_certificate_bundles"] = granular_certificate_bundles_read
 
