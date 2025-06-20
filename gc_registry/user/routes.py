@@ -43,6 +43,16 @@ def create_user(
 ):
     validate_user_role(current_user, required_role=UserRoles.ADMIN)
     user_base.hashed_password = get_password_hash(user_base.password)
+
+    existing_user = read_session.exec(
+        select(User).where(User.email == user_base.email)
+    ).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"User with email {user_base.email} already exists.",
+        )
+
     user = User.create(user_base, write_session, read_session, esdb_client)
 
     return user
@@ -167,6 +177,15 @@ def create_test_account(
     Returns the user and account details, as well as the password to be returned to the user.
     """
 
+    existing_user = read_session.exec(
+        select(User).where(User.email == webinar_signup.email)
+    ).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"User with email {webinar_signup.email} already exists.",
+        )
+
     # Create a random password for the user
     random_password = secrets.token_urlsafe(12)
 
@@ -175,16 +194,22 @@ def create_test_account(
         name=webinar_signup.name,
         organisation=webinar_signup.organisation,
         password=random_password,
+        hashed_password=get_password_hash(random_password),
         role=UserRoles.PRODUCTION_USER,
     )
 
     _user = User.create(user_base, write_session, read_session, esdb_client)
-    if _user is not None:
-        user: User = cast(User, _user[0])
+    if not _user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Could not create user please contact support.",
+        )
+    user: User = cast(User, _user[0])
+    user_dict = user.model_dump()
 
     # Create a new empty account for the user
     account_dict = {
-        "account_name": f"{webinar_signup.name}'s Account",
+        "account_name": webinar_signup.organisation,
         "user_ids": [user.id],
     }
     _account = Account.create(account_dict, write_session, read_session, esdb_client)
@@ -227,8 +252,10 @@ def create_test_account(
         white_list_link_dict_send, write_session, read_session, esdb_client
     )
 
+    user_dict.update({"id": user.id, "account_name": account.account_name})
+
     return CreateTestAccountResponse(
-        user=UserRead.model_validate(user.model_dump()),
+        user=UserRead.model_validate(user_dict),
         account=AccountRead.model_validate(account.model_dump()),
         password=random_password,
     )
