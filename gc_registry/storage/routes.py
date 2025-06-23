@@ -160,9 +160,7 @@ async def create_storage_allocation(
         csv_file = io.StringIO(contents.decode("utf-8"))
 
         # Convert to DataFrame and replace NaN values with None
-        allocated_storage_records_df = pd.read_csv(
-            csv_file, na_values=pd.NA, keep_default_na=False
-        )
+        allocated_storage_records_df = pd.read_csv(csv_file, keep_default_na=False)
         allocated_storage_records_df["device_id"] = deviceID
 
         # Check that the device ID is associated with an account that the user has access to
@@ -188,6 +186,12 @@ async def create_storage_allocation(
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    if not allocated_storage_records:
+        raise HTTPException(
+            status_code=400,
+            detail="No valid allocated storage records were created from the submitted data.",
+        )
 
     return AllocatedStorageRecordSubmissionResponse(
         total_records=len(allocated_storage_records),
@@ -221,7 +225,7 @@ def issue_SDGCs(
         # Retrieve the allocated storage records
         allocated_storage_records = read_session.exec(
             select(AllocatedStorageRecord).where(
-                AllocatedStorageRecord.id.in_(allocated_storage_record_ids)
+                AllocatedStorageRecord.id.in_(allocated_storage_record_ids)  # type: ignore
             )
         ).all()
 
