@@ -85,7 +85,7 @@ def create_allocated_storage_records_from_submitted_data(
         raise ValueError(
             "Only one device ID is supported for Allocated Storage Record creation."
         )
-    device_id = device_ids[0]
+    device_id = int(device_ids[0])
 
     # Retrieve all validator storage record IDs for the device
     validator_storage_record_ids = StorageRecord.validator_ids_by_device_id(
