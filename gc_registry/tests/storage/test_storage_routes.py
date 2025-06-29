@@ -1,10 +1,13 @@
+import datetime
 import io
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from gc_registry.core.models.base import UserRoles
 from gc_registry.device.models import Device
+from gc_registry.storage.models import AllocatedStorageRecord
 
 
 @pytest.fixture
@@ -85,3 +88,119 @@ def test_submit_storage_records_success(
     # response_data = response.json()
     # assert response_data["message"] == "Allocation records created successfully."
     # assert response_data["total_records"] == 2
+
+
+def test_get_allocated_storage_records_by_device_id(
+    api_client: TestClient,
+    token_storage_validator: str,
+    fake_db_storage_device: Device,
+    fake_db_allocated_storage_records: list[AllocatedStorageRecord],
+    read_session: Session,
+):
+    """Test retrieval of allocated storage records by device ID."""
+    # Define the device ID to query
+    device_id = fake_db_storage_device.id
+
+    # Make the API request
+    response = api_client.get(
+        f"/storage/allocated_storage_records/{device_id}",
+        headers={"Authorization": f"Bearer {token_storage_validator}"},
+    )
+
+    # Check the response status code
+    assert response.status_code == 200
+
+    # Check the response data structure
+    response_data = response.json()
+    assert isinstance(response_data, list)
+    for record in response_data:
+        assert "device_id" in record
+        assert record["device_id"] == device_id
+
+
+def test_get_allocated_storage_records_invalid_date_range_order(
+    api_client: TestClient,
+    token_storage_validator: str,
+    fake_db_storage_device: Device,
+    fake_db_allocated_storage_records: list[AllocatedStorageRecord],
+):
+    """Test 400 when created_after is not before created_before."""
+    device_id = fake_db_storage_device.id
+    created_after = datetime.datetime.now().date()
+    created_before = (datetime.datetime.now() - datetime.timedelta(days=5)).date()
+
+    response = api_client.get(
+        f"/storage/allocated_storage_records/{device_id}",
+        params={
+            "created_after": created_after.isoformat(),
+            "created_before": created_before.isoformat(),
+        },
+        headers={"Authorization": f"Bearer {token_storage_validator}"},
+    )
+
+    assert response.status_code == 400
+    assert "created_after must be before created_before" in response.json()["detail"]
+
+
+def test_get_allocated_storage_records_date_range_too_large(
+    api_client: TestClient,
+    token_storage_validator: str,
+    fake_db_storage_device: Device,
+    fake_db_allocated_storage_records: list[AllocatedStorageRecord],
+):
+    """Test 400 when date range exceeds 30 days."""
+    device_id = fake_db_storage_device.id
+    created_after = (datetime.datetime.now() - datetime.timedelta(days=35)).date()
+    created_before = datetime.datetime.now().date()
+
+    response = api_client.get(
+        f"/storage/allocated_storage_records/{device_id}",
+        params={
+            "created_after": created_after.isoformat(),
+            "created_before": created_before.isoformat(),
+        },
+        headers={"Authorization": f"Bearer {token_storage_validator}"},
+    )
+
+    assert response.status_code == 400
+    assert "Date range cannot exceed 30 days" in response.json()["detail"]
+
+
+@pytest.mark.parametrize(
+    "unauthorized_role",
+    [
+        UserRoles.TRADING_USER,
+        UserRoles.AUDIT_USER,
+    ],
+)
+def test_unauthorized_user_role_access_denied(
+    unauthorized_role: UserRoles,
+    api_client: TestClient,
+    account_factory,
+    user_factory,
+    auth_factory,
+    fake_db_storage_device: Device,
+    fake_db_allocated_storage_records: list[AllocatedStorageRecord],
+):
+    """Test that users without proper roles are denied access."""
+
+    unauthorized_user = user_factory(unauthorized_role, "unauthorized")
+    account = account_factory(unauthorized_user, "unauthorized_account")
+    unauthorized_token = auth_factory(unauthorized_user)
+
+    print("ACCOUNT", account.id, account.user_ids)
+    print("UNAUTHORIZED USER", unauthorized_user.id, unauthorized_user.role)
+
+    device_id = fake_db_storage_device.id
+
+    response = api_client.get(
+        f"/storage/allocated_storage_records/{device_id}",
+        headers={"Authorization": f"Bearer {unauthorized_token}"},
+    )
+
+    print(response.text)
+    assert response.status_code == 403
+    assert (
+        "User must be an Admin, Production or Storage Validator"
+        in response.json()["detail"]
+    )
