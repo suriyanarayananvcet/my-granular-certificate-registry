@@ -32,8 +32,8 @@ def create_bundle_hash(
     Returns:
         str: The hash of the child GC Bundle
     """
-
-    granular_certificate_bundle_dict = granular_certificate_bundle.model_dump_json(
-        exclude=set(["id", "created_at", "hash"] + mutable_gc_attributes)
-    )
+    if not isinstance(granular_certificate_bundle, dict):
+        granular_certificate_bundle_dict = granular_certificate_bundle.model_dump_json(
+            exclude=set(["id", "created_at", "hash"] + mutable_gc_attributes)
+        )
     return sha256(f"{granular_certificate_bundle_dict}{nonce}".encode()).hexdigest()

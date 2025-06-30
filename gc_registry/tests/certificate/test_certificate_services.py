@@ -293,7 +293,7 @@ class TestCertificateServices:
         self,
         fake_db_account: Account,
         fake_db_account_2: Account,
-        fake_db_user: User,
+        fake_db_admin_user: User,
         fake_db_granular_certificate_bundle: GranularCertificateBundle,
         write_session: Session,
         read_session: Session,
@@ -305,7 +305,7 @@ class TestCertificateServices:
 
         assert fake_db_account.id is not None
         assert fake_db_account_2.id is not None
-        assert fake_db_user.id is not None
+        assert fake_db_admin_user.id is not None
         assert fake_db_granular_certificate_bundle.id is not None
 
         # Whitelist the source account for the target account
@@ -325,7 +325,7 @@ class TestCertificateServices:
         certificate_transfer = GranularCertificateTransfer(
             source_id=fake_db_account.id,
             target_id=fake_db_account_2.id,
-            user_id=fake_db_user.id,
+            user_id=fake_db_admin_user.id,
             granular_certificate_bundle_ids=[fake_db_granular_certificate_bundle.id],
             certificate_quantity=500,
         )
@@ -340,7 +340,7 @@ class TestCertificateServices:
 
         # Check that the target account received the split bundle
         certificate_query = GranularCertificateQuery(
-            user_id=fake_db_user.id,
+            user_id=fake_db_admin_user.id,
             source_id=fake_db_account_2.id,
         )
         certificate_transfered = query_certificate_bundles(
@@ -368,7 +368,7 @@ class TestCertificateServices:
         certificate_transfer = GranularCertificateTransfer(
             source_id=fake_db_account.id,
             target_id=fake_db_account_2.id,
-            user_id=fake_db_user.id,
+            user_id=fake_db_admin_user.id,
             granular_certificate_bundle_ids=[fake_db_granular_certificate_bundle.id],
             certificate_quantity=500,
         )
@@ -384,7 +384,7 @@ class TestCertificateServices:
         self,
         fake_db_account: Account,
         fake_db_account_2: Account,
-        fake_db_user: User,
+        fake_db_admin_user: User,
         fake_db_granular_certificate_bundle: GranularCertificateBundle,
         write_session: Session,
         read_session: Session,
@@ -396,12 +396,12 @@ class TestCertificateServices:
 
         assert fake_db_account.id is not None
         assert fake_db_account_2.id is not None
-        assert fake_db_user.id is not None
+        assert fake_db_admin_user.id is not None
         assert fake_db_granular_certificate_bundle.id is not None
 
         certificate_cancel = GranularCertificateCancel(
             source_id=fake_db_account.id,
-            user_id=fake_db_user.id,
+            user_id=fake_db_admin_user.id,
             granular_certificate_bundle_ids=[fake_db_granular_certificate_bundle.id],
         )
 
@@ -436,7 +436,7 @@ class TestCertificateServices:
         certificate_transfer = GranularCertificateTransfer(
             source_id=fake_db_account.id,
             target_id=fake_db_account_2.id,
-            user_id=fake_db_user.id,
+            user_id=fake_db_admin_user.id,
             granular_certificate_bundle_ids=[fake_db_granular_certificate_bundle.id],
         )
 
@@ -448,7 +448,7 @@ class TestCertificateServices:
     def test_cancel_by_percentage(
         self,
         fake_db_granular_certificate_bundle: GranularCertificateBundle,
-        fake_db_user: User,
+        fake_db_admin_user: User,
         write_session: Session,
         read_session: Session,
         esdb_client: EventStoreDBClient,
@@ -460,11 +460,11 @@ class TestCertificateServices:
 
         # check that all the test fixtures have ids
         assert fake_db_granular_certificate_bundle.id is not None
-        assert fake_db_user.id is not None
+        assert fake_db_admin_user.id is not None
 
         certificate_action = GranularCertificateCancel(
             source_id=fake_db_granular_certificate_bundle.account_id,
-            user_id=fake_db_user.id,
+            user_id=fake_db_admin_user.id,
             granular_certificate_bundle_ids=[fake_db_granular_certificate_bundle.id],
             certificate_bundle_percentage=0.75,
         )
@@ -475,7 +475,7 @@ class TestCertificateServices:
 
         # Check that 75% of the bundle was cancelled
         certificate_query = GranularCertificateQuery(
-            user_id=fake_db_user.id,
+            user_id=fake_db_admin_user.id,
             source_id=fake_db_granular_certificate_bundle.account_id,
             certificate_bundle_status=CertificateStatus.CANCELLED,
         )
@@ -491,12 +491,12 @@ class TestCertificateServices:
         fake_db_granular_certificate_bundle: GranularCertificateBundle,
         fake_db_granular_certificate_bundle_2: GranularCertificateBundle,
         read_session: Session,
-        fake_db_user: User,
+        fake_db_admin_user: User,
     ):
         """Test that the query_certificate_bundles function can handle sparse filter input on device ID
         and production starting datetime."""
 
-        assert fake_db_user.id is not None
+        assert fake_db_admin_user.id is not None
         assert fake_db_granular_certificate_bundle.id is not None
         assert fake_db_granular_certificate_bundle_2.id is not None
 
@@ -537,7 +537,7 @@ class TestCertificateServices:
         # Test with an issuance ID that doesn't exist
         with pytest.raises(HTTPException) as exc_info:
             certificate_query = GranularCertificateQuery(
-                user_id=fake_db_user.id,
+                user_id=fake_db_admin_user.id,
                 source_id=fake_db_granular_certificate_bundle.account_id,
                 issuance_ids=["invalid_id"],
             )
@@ -545,7 +545,7 @@ class TestCertificateServices:
         assert "Invalid issuance ID" in str(exc_info.value)
 
         certificate_query = GranularCertificateQuery(
-            user_id=fake_db_user.id,
+            user_id=fake_db_admin_user.id,
             source_id=fake_db_granular_certificate_bundle.account_id,
             issuance_ids=["999-2027-12-01 12:30:00"],
         )

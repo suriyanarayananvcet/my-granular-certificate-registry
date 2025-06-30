@@ -72,6 +72,11 @@ def validate_allocated_records_against_gc_bundles(
                 f"GC Bundle with ID {allocated_storage_record.gc_allocation_id} not found"
             )
 
+        if not scr_record:
+            raise ValueError(
+                f"SCR Record with ID {allocated_storage_record.scr_allocation_id} not found"
+            )
+
         if (
             gc_bundle.bundle_quantity
             != allocated_storage_record.sdr_proportion * scr_record.flow_energy

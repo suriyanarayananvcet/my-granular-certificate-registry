@@ -2,12 +2,11 @@ FROM node:20-bullseye-slim
 
 WORKDIR /app
 
-# ENV REACT_APP_API_URL=https://api-dot-rich-store-445612-c6.ew.r.appspot.com
-ENV REACT_APP_API_URL=http://localhost:8001
+ENV REACT_APP_API_URL=https://api-640576971908.us-east1.run.app
 
-COPY . .
-
-RUN mkdir -p dist && chmod 777 dist
+COPY ./package.json ./package.json
+COPY ./package-lock.json ./package-lock.json
+COPY ./webpack.config.js ./webpack.config.js
 
 COPY ./src ./src
 RUN npm install

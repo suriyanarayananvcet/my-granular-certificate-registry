@@ -1,10 +1,11 @@
 import datetime
-from typing import Any
+from typing import Any, Hashable
 
 import pandas as pd
 from esdbclient import EventStoreDBClient
 from fastapi import Depends
-from sqlmodel import Session, select
+from sqlmodel import Session, SQLModel, select
+from sqlmodel.sql.expression import SelectOfScalar
 
 from gc_registry.certificate.models import GranularCertificateBundle
 from gc_registry.certificate.services import get_max_certificate_id_by_device_id
@@ -22,6 +23,37 @@ from gc_registry.storage.validation import (
     validate_allocated_records,
     validate_allocated_records_against_gc_bundles,
 )
+
+
+def get_device_ids_in_allocated_storage_records(read_session: Session) -> list[int]:
+    """Retrieve all device IDs that have allocated storage records."""
+
+    # Query the database for unique device IDs in allocated storage records
+    device_ids = read_session.exec(
+        select(AllocatedStorageRecord.device_id).distinct()
+    ).all()
+
+    return list(device_ids)
+
+
+def get_allocated_storage_records_by_device_id(
+    device_id: int,
+    read_session: Session,
+    created_after: datetime.date,
+    created_before: datetime.date,
+) -> list[AllocatedStorageRecord] | None:
+    """Retrieve all Allocated Storage Records for the specified device."""
+
+    # Query the database for allocated storage records for the specified device
+    query: SelectOfScalar = select(AllocatedStorageRecord).where(
+        AllocatedStorageRecord.device_id == device_id,
+        AllocatedStorageRecord.created_at >= created_after,
+        AllocatedStorageRecord.created_at < created_before,
+    )
+
+    allocated_storage_records = read_session.exec(query).all()
+
+    return allocated_storage_records
 
 
 def create_charge_records_from_metering_data(
@@ -72,7 +104,7 @@ def create_allocated_storage_records_from_submitted_data(
     write_session: Session = Depends(db.get_write_session),
     read_session: Session = Depends(db.get_read_session),
     esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
-) -> list[AllocatedStorageRecord]:
+) -> list[SQLModel] | None:
     """Storage Validator Only: Create a list of Allocated Storage Records from the specified submitted data.
 
     Relies on there being existing validated Storage Charge/Discharge Records for the specified device that include
@@ -85,7 +117,7 @@ def create_allocated_storage_records_from_submitted_data(
         raise ValueError(
             "Only one device ID is supported for Allocated Storage Record creation."
         )
-    device_id = device_ids[0]
+    device_id = int(device_ids[0])
 
     # Retrieve all validator storage record IDs for the device
     validator_storage_record_ids = StorageRecord.validator_ids_by_device_id(
@@ -117,7 +149,7 @@ def create_allocated_storage_records_from_submitted_data(
     if len(gc_bundle_ids) != 0:
         gc_bundles_ids_in_db = read_session.exec(
             select(GranularCertificateBundle.id).where(
-                GranularCertificateBundle.id.in_(gc_bundle_ids),
+                GranularCertificateBundle.id.in_(gc_bundle_ids),  # type: ignore[union-attr]
                 GranularCertificateBundle.certificate_bundle_status
                 == CertificateStatus.CANCELLED,
             )
@@ -189,13 +221,13 @@ def issue_sdgcs_against_allocated_records(
     write_session: Session = Depends(db.get_write_session),
     read_session: Session = Depends(db.get_read_session),
     esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
-) -> list[GranularCertificateBundle]:
+) -> list[SQLModel]:
     """Issue SDGCs against the specified allocated storage records."""
 
     # Retrieve the allocated storage records
     allocated_storage_records = read_session.exec(
         select(AllocatedStorageRecord).where(
-            AllocatedStorageRecord.id.in_(allocated_storage_record_ids)
+            AllocatedStorageRecord.id.in_(allocated_storage_record_ids)  # type: ignore[union-attr]
         )
     ).all()
 
@@ -211,7 +243,7 @@ def issue_sdgcs_against_allocated_records(
     # Retrieve the GC Bundles that have been cancelled and are associated with the allocated storage records
     cancelled_gc_bundles = read_session.exec(
         select(GranularCertificateBundle).where(
-            GranularCertificateBundle.id.in_(
+            GranularCertificateBundle.id.in_(  # type: ignore[union-attr]
                 [record.gc_allocation_id for record in allocated_storage_records]
             ),
             GranularCertificateBundle.certificate_bundle_status
@@ -232,7 +264,7 @@ def issue_sdgcs_against_allocated_records(
     scr_ids = [record.scr_allocation_id for record in allocated_storage_records]
     sdr_ids = [record.sdr_allocation_id for record in allocated_storage_records]
     charge_records = read_session.exec(
-        select(StorageRecord).where(StorageRecord.id.in_(scr_ids + sdr_ids))
+        select(StorageRecord).where(StorageRecord.id.in_(scr_ids + sdr_ids))  # type: ignore[union-attr]
     ).all()
 
     # Validate that the GC Bundles have sufficient quantities and datetimes to cover the allocated storage records
@@ -272,14 +304,21 @@ def issue_sdgcs_against_allocated_records(
     # Get SDRs for the specified allocation records
     sdr_ids = [record.sdr_allocation_id for record in allocated_storage_records]
     sdr_records = read_session.exec(
-        select(StorageRecord).where(StorageRecord.id.in_(sdr_ids))
+        select(StorageRecord).where(StorageRecord.id.in_(sdr_ids))  # type: ignore[union-attr]
     ).all()
     sdr_records_df = pd.DataFrame(sdr_records)
 
     # Get the max certificate bundle ID for the specified device
+
+    if not device.id:
+        raise ValueError("Device ID not found.")
+
     max_certificate_bundle_id = get_max_certificate_id_by_device_id(
         read_session, device.id
     )
+
+    if max_certificate_bundle_id is None:
+        raise ValueError(f"No certificate bundles found for device ID {device.id}.")
 
     mapped_sdgcs = map_allocation_to_certificates(
         sdgcs_to_issue=sdgcs_to_issue,
@@ -294,6 +333,9 @@ def issue_sdgcs_against_allocated_records(
         mapped_sdgcs, write_session, read_session, esdb_client
     )
 
+    if not issued_sdgcs:
+        raise ValueError("No SDGCs were created. Please check the input data.")
+
     return issued_sdgcs
 
 
@@ -303,7 +345,7 @@ def map_allocation_to_certificates(
     account_id: int,
     device: Device,
     certificate_bundle_id_range_start: int = 0,
-) -> list[dict[str, Any]]:
+) -> list[dict[Hashable, Any]]:
     mapped_data: list = []
     for sdgc in sdgcs_to_issue:
         sdr = sdr_records_df.loc[
@@ -349,6 +391,7 @@ def map_allocation_to_certificates(
         transformed["issuance_id"] = (
             f"{device.id}-{transformed['production_starting_interval']}"
         )
+
         transformed["hash"] = create_bundle_hash(transformed, nonce="")
 
         mapped_data.append(transformed)
