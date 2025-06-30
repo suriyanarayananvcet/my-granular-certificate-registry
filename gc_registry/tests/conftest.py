@@ -613,6 +613,8 @@ def valid_storage_record_csv(fake_db_storage_device: Device) -> str:
 {fake_db_storage_device.id},true,2024-01-01T00:00:00,2024-01-01T01:00:00,1000.5,VAL001
 {fake_db_storage_device.id},false,2024-01-01T02:00:00,2024-01-01T03:00:00,850.0,VAL002"""
     return csv_content
+
+
 @pytest.fixture()
 def fake_db_storage_records(
     write_session: Session,

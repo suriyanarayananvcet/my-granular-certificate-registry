@@ -85,7 +85,7 @@ async def submit_readings(
     df = pd.read_csv(csv_file)
     df["device_id"] = device_id
 
-    passed,df, message = validate_readings(df)
+    passed, df, message = validate_readings(df)
     if not passed:
         raise HTTPException(
             status_code=400,
@@ -142,12 +142,8 @@ async def submit_readings(
         )
         issue_certificates_by_device_in_date_range(
             device=device,
-            from_datetime=pd.to_datetime(
-                df["interval_start_datetime"].min(), utc=True
-            ),
-            to_datetime=pd.to_datetime(
-                df["interval_end_datetime"].max(), utc=True
-            ),
+            from_datetime=pd.to_datetime(df["interval_start_datetime"].min(), utc=True),
+            to_datetime=pd.to_datetime(df["interval_end_datetime"].max(), utc=True),
             write_session=write_session,
             read_session=read_session,
             esdb_client=esdb_client,

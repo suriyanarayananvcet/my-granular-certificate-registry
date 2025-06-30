@@ -1,17 +1,10 @@
 import datetime
-
-from sqlmodel import Session, desc, select
-from sqlmodel.sql.expression import SelectOfScalar
-
-from gc_registry.storage.models import AllocatedStorageRecord, StorageRecord
-
-
 from typing import Any, Hashable
 
 import pandas as pd
 from esdbclient import EventStoreDBClient
 from fastapi import Depends
-from sqlmodel import Session, SQLModel, select
+from sqlmodel import Session, SQLModel, desc, select
 from sqlmodel.sql.expression import SelectOfScalar
 
 from gc_registry.certificate.models import GranularCertificateBundle
@@ -30,7 +23,6 @@ from gc_registry.storage.validation import (
     validate_allocated_records,
     validate_allocated_records_against_gc_bundles,
 )
-
 
 
 def get_latest_storage_record_by_device_id(
@@ -52,8 +44,6 @@ def get_latest_storage_record_by_device_id(
     latest_record = read_session.exec(query).first()
 
     return latest_record
-
-
 
 
 def get_device_ids_in_allocated_storage_records(read_session: Session) -> list[int]:
@@ -95,7 +85,7 @@ def create_charge_records_from_metering_data(
 ) -> dict:
     """Create a Storage Charge Record from the specified metering data."""
 
-    storage_records_df["is_charging"] = storage_records_df["flow_energy"] < 0 
+    storage_records_df["is_charging"] = storage_records_df["flow_energy"] < 0
     storage_records_df["flow_energy"] = storage_records_df["flow_energy"].abs()
 
     # Create the storage records
@@ -423,4 +413,3 @@ def map_allocation_to_certificates(
         mapped_data.append(transformed)
 
     return mapped_data
-

@@ -1,12 +1,3 @@
-from esdbclient import EventStoreDBClient
-from fastapi import APIRouter, Depends
-import datetime
-import io
-
-from esdbclient import EventStoreDBClient
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-import pandas as pd
-from sqlmodel import Session
 import datetime
 import io
 from pathlib import Path
@@ -15,7 +6,7 @@ import pandas as pd
 from esdbclient import EventStoreDBClient
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from gc_registry.account.services import get_accounts_by_user_id
 from gc_registry.authentication.services import get_current_user
@@ -23,21 +14,16 @@ from gc_registry.certificate.models import GranularCertificateBundle
 from gc_registry.certificate.schemas import GranularCertificateBundleCreate
 from gc_registry.core.database import db, events
 from gc_registry.core.models.base import UserRoles
-from gc_registry.device.services import get_device_by_id, get_devices_by_account_id
-from gc_registry.measurement.models import MeasurementReport, MeasurementSubmissionResponse
 from gc_registry.device.models import Device
-from gc_registry.device.services import get_devices_by_account_id
+from gc_registry.device.services import get_device_by_id, get_devices_by_account_id
 from gc_registry.logging_config import logger
 from gc_registry.storage.models import (
     AllocatedStorageRecord,
     StorageAction,
-    StorageRecord,
 )
 from gc_registry.storage.schemas import (
     AllocatedStorageRecordSubmissionResponse,
     StorageActionResponse,
-    StorageRecordBase,
-    StorageRecordQueryResponse,
     StorageRecordSubmissionResponse,
 )
 from gc_registry.storage.services import (
@@ -45,11 +31,9 @@ from gc_registry.storage.services import (
     create_charge_records_from_metering_data,
     get_allocated_storage_records_by_device_id,
     get_device_ids_in_allocated_storage_records,
-    issue_sdgcs_against_allocated_records,
 )
 from gc_registry.storage.validation import validate_storage_records
 from gc_registry.user.models import User
-from gc_registry.user.validation import validate_user_access, validate_user_role
 from gc_registry.user.validation import (
     validate_user_access,
     validate_user_role,
@@ -126,11 +110,9 @@ async def submit_storage_records(
 
         # Convert to DataFrame
         df = pd.read_csv(csv_file)
-        
+
     except Exception as e:
-        raise HTTPException(
-            status_code=400, detail=f"Error reading CSV file: {str(e)}"
-        )
+        raise HTTPException(status_code=400, detail=f"Error reading CSV file: {str(e)}")
 
     df["device_id"] = device_id
 
@@ -141,12 +123,13 @@ async def submit_storage_records(
         raise HTTPException(
             status_code=404, detail=f"Device with ID {device_id} not found."
         )
-    
+
     if not device.is_storage:
         raise HTTPException(
-            status_code=400, detail=f"Device with ID {device_id} is not a storage device."
+            status_code=400,
+            detail=f"Device with ID {device_id} is not a storage device.",
         )
-    
+
     passed, message = validate_storage_records(df, read_session, device_id)
     if not passed:
         raise HTTPException(
@@ -206,7 +189,8 @@ async def create_storage_allocation(
             )
         if not device.is_storage:
             raise HTTPException(
-                status_code=400, detail=f"Device with ID {device_id} is not a storage device."
+                status_code=400,
+                detail=f"Device with ID {device_id} is not a storage device.",
             )
 
         validate_user_access(current_user, device.account_id, read_session)
@@ -233,7 +217,6 @@ async def create_storage_allocation(
         total_records=len(allocated_storage_records),
         message="Allocation records created successfully.",
     )
-
 
 
 @router.post(
@@ -385,8 +368,3 @@ def get_allocated_storage_records(
     )
 
     return allocated_storage_records
-
-
-
-
-
