@@ -49,6 +49,19 @@ def get_device_by_id(db_session: Session, device_id: int) -> Device | None:
     return device
 
 
+def get_device_by_local_identifier(
+    db_session: Session, local_device_identifier: str
+) -> Device | None:
+    """Get a device by its local identifier."""
+    query: SelectOfScalar = select(Device).where(
+        Device.local_device_identifier == local_device_identifier,
+        not Device.is_deleted,
+    )
+
+    device = db_session.exec(query).first()
+    return device
+
+
 def device_mw_capacity_to_wh_max(
     device_capacity_mw: float, hours: float = settings.CERTIFICATE_GRANULARITY_HOURS
 ) -> float:
