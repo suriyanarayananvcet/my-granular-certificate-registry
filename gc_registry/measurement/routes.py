@@ -18,7 +18,13 @@ from gc_registry.core.models.base import UserRoles
 from gc_registry.device.meter_data.manual_submission import ManualSubmissionMeterClient
 from gc_registry.device.models import Device
 from gc_registry.logging_config import logger
-from gc_registry.measurement import models
+from gc_registry.measurement.models import MeasurementReport
+from gc_registry.measurement.schemas import (
+    MeasurementReportBase,
+    MeasurementReportRead,
+    MeasurementReportUpdate,
+    MeasurementSubmissionResponse,
+)
 from gc_registry.user.models import User
 from gc_registry.user.validation import validate_user_access, validate_user_role
 
@@ -49,7 +55,7 @@ def get_meter_readings_template(current_user: User = Depends(get_current_user)):
     )
 
 
-@router.post("/submit_readings", response_model=models.MeasurementSubmissionResponse)
+@router.post("/submit_readings", response_model=MeasurementSubmissionResponse)
 async def submit_readings(
     file: UploadFile = File(...),
     deviceID: int = Form(...),
@@ -96,7 +102,7 @@ async def submit_readings(
 
     validate_user_access(current_user, device.account_id, read_session)
 
-    readings = models.MeasurementReport.create(
+    readings = MeasurementReport.create(
         measurement_df.to_dict(orient="records"),
         write_session,
         read_session,
@@ -122,7 +128,7 @@ async def submit_readings(
         raise HTTPException(status_code=404, detail="Could not find issuance metadata.")
 
     try:
-        measurement_response = models.MeasurementSubmissionResponse(
+        measurement_response = MeasurementSubmissionResponse(
             message="Readings submitted successfully.",
             total_device_usage=measurement_df["interval_usage"].astype(int).sum(),
             first_reading_datetime=pd.to_datetime(
@@ -153,9 +159,9 @@ async def submit_readings(
     return measurement_response
 
 
-@router.post("/create", response_model=models.MeasurementReportRead)
+@router.post("/create", response_model=MeasurementReportRead)
 def create_measurement(
-    measurement_base: models.MeasurementReportBase,
+    measurement_base: MeasurementReportBase,
     current_user: User = Depends(get_current_user),
     write_session: Session = Depends(db.get_write_session),
     read_session: Session = Depends(db.get_read_session),
@@ -166,14 +172,14 @@ def create_measurement(
     device = Device.by_id(measurement_base.device_id, read_session)
     validate_user_access(current_user, device.account_id, read_session)
 
-    measurement = models.MeasurementReport.create(
+    measurement = MeasurementReport.create(
         measurement_base, write_session, read_session, esdb_client
     )
 
     return measurement
 
 
-@router.get("/{measurement_id}", response_model=models.MeasurementReportRead)
+@router.get("/{measurement_id}", response_model=MeasurementReportRead)
 def read_measurement(
     measurement_id: int,
     current_user: User = Depends(get_current_user),
@@ -181,15 +187,15 @@ def read_measurement(
 ):
     validate_user_role(current_user, required_role=UserRoles.AUDIT_USER)
 
-    measurement = models.MeasurementReport.by_id(measurement_id, read_session)
+    measurement = MeasurementReport.by_id(measurement_id, read_session)
 
     return measurement
 
 
-@router.patch("/update/{measurement_id}", response_model=models.MeasurementReportRead)
+@router.patch("/update/{measurement_id}", response_model=MeasurementReportRead)
 def update_measurement(
     measurement_id: int,
-    measurement_update: models.MeasurementReportUpdate,
+    measurement_update: MeasurementReportUpdate,
     current_user: User = Depends(get_current_user),
     write_session: Session = Depends(db.get_write_session),
     read_session: Session = Depends(db.get_read_session),
@@ -198,14 +204,14 @@ def update_measurement(
     # Measurement updates are only allowed for Admin users as GCs may have been issued against them
     validate_user_role(current_user, required_role=UserRoles.ADMIN)
 
-    measurement = models.MeasurementReport.by_id(measurement_id, read_session)
+    measurement = MeasurementReport.by_id(measurement_id, read_session)
 
     return measurement.update(
         measurement_update, write_session, read_session, esdb_client
     )
 
 
-@router.delete("/delete/{id}", response_model=models.MeasurementReportRead)
+@router.delete("/delete/{id}", response_model=MeasurementReportRead)
 def delete_measurement(
     measurement_id: int,
     current_user: User = Depends(get_current_user),
@@ -216,6 +222,6 @@ def delete_measurement(
     # Measurement deletions are only allowed for Admin users as GCs may have been issued against them
     validate_user_role(current_user, required_role=UserRoles.ADMIN)
 
-    db_measurement = models.MeasurementReport.by_id(measurement_id, write_session)
+    db_measurement = MeasurementReport.by_id(measurement_id, write_session)
 
     return db_measurement.delete(write_session, read_session, esdb_client)
