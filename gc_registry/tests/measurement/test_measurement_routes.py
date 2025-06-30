@@ -37,7 +37,7 @@ def test_submit_readings_success(
 
     # Create form data
     data = {
-        "deviceID": str(fake_db_solar_device.id),
+        "device_id": str(fake_db_solar_device.id),
     }
 
     response = api_client.post(

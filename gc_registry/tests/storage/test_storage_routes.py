@@ -48,7 +48,7 @@ def test_submit_storage_records_success(
 
     # Create form data
     data = {
-        "deviceID": str(fake_db_storage_device.id),
+        "device_id": str(fake_db_storage_device.id),
     }
 
     # Submit storage records

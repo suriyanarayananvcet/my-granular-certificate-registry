@@ -4,7 +4,7 @@ from typing import Any, Hashable
 import pandas as pd
 from esdbclient import EventStoreDBClient
 from fastapi import Depends
-from sqlmodel import Session, SQLModel, desc, select
+from sqlmodel import Session, SQLModel, select
 from sqlmodel.sql.expression import SelectOfScalar
 
 from gc_registry.certificate.models import GranularCertificateBundle
@@ -23,27 +23,6 @@ from gc_registry.storage.validation import (
     validate_allocated_records,
     validate_allocated_records_against_gc_bundles,
 )
-
-
-def get_latest_storage_record_by_device_id(
-    device_id: int,
-    read_session: Session,
-) -> StorageRecord | None:
-    """Retrieve the latest Storage Record for the specified device."""
-
-    # Query the database for the latest allocated storage record for the specified device
-    query: SelectOfScalar = (
-        select(StorageRecord)
-        .where(
-            AllocatedStorageRecord.device_id == device_id,
-        )
-        .order_by(desc(StorageRecord.flow_start_datetime))
-        .limit(1)
-    )
-
-    latest_record = read_session.exec(query).first()
-
-    return latest_record
 
 
 def get_device_ids_in_allocated_storage_records(read_session: Session) -> list[int]:
