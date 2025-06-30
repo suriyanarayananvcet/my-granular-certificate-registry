@@ -605,3 +605,12 @@ def fake_db_granular_certificate_bundle_2(
     )
 
     return granular_certificate_bundle_write
+
+
+@pytest.fixture
+def valid_storage_record_csv(fake_db_storage_device: Device) -> str:
+    """Create a valid CSV string for storage record testing."""
+    csv_content = f"""device_id,is_charging,flow_start_datetime,flow_end_datetime,flow_energy,validator_id
+{fake_db_storage_device.id},true,2024-01-01T00:00:00,2024-01-01T01:00:00,1000.5,VAL001
+{fake_db_storage_device.id},false,2024-01-01T02:00:00,2024-01-01T03:00:00,850.0,VAL002"""
+    return csv_content

@@ -82,10 +82,10 @@ async def submit_readings(
     csv_file = io.StringIO(contents.decode("utf-8"))
 
     # Convert to DataFrame
-    measurement_df = pd.read_csv(csv_file)
-    measurement_df["device_id"] = device_id
+    df = pd.read_csv(csv_file)
+    df["device_id"] = device_id
 
-    passed,measurement_df, message = validate_readings(measurement_df)
+    passed,df, message = validate_readings(df)
     if not passed:
         raise HTTPException(
             status_code=400,
@@ -105,7 +105,7 @@ async def submit_readings(
     validate_user_access(current_user, device.account_id, read_session)
 
     readings = models.MeasurementReport.create(
-        measurement_df.to_dict(orient="records"),
+        df.to_dict(orient="records"),
         write_session,
         read_session,
         esdb_client,
@@ -132,21 +132,21 @@ async def submit_readings(
     try:
         measurement_response = models.MeasurementSubmissionResponse(
             message="Readings submitted successfully.",
-            total_device_usage=measurement_df["interval_usage"].astype(int).sum(),
+            total_device_usage=df["interval_usage"].astype(int).sum(),
             first_reading_datetime=pd.to_datetime(
-                measurement_df["interval_start_datetime"].min(), utc=True
+                df["interval_start_datetime"].min(), utc=True
             ),
             last_reading_datetime=pd.to_datetime(
-                measurement_df["interval_start_datetime"].max(), utc=True
+                df["interval_start_datetime"].max(), utc=True
             ),
         )
         issue_certificates_by_device_in_date_range(
             device=device,
             from_datetime=pd.to_datetime(
-                measurement_df["interval_start_datetime"].min(), utc=True
+                df["interval_start_datetime"].min(), utc=True
             ),
             to_datetime=pd.to_datetime(
-                measurement_df["interval_end_datetime"].max(), utc=True
+                df["interval_end_datetime"].max(), utc=True
             ),
             write_session=write_session,
             read_session=read_session,

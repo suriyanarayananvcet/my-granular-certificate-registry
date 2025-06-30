@@ -85,3 +85,33 @@ def test_submit_storage_records_success(
     # response_data = response.json()
     # assert response_data["message"] == "Allocation records created successfully."
     # assert response_data["total_records"] == 2
+
+
+def test_submit_storage_charge_records_success(
+    api_client: TestClient,
+    token: str,
+    valid_storage_record_csv: str,
+    fake_db_storage_device: Device,
+    read_session: Session,
+):
+    """Test successful submission of storage charge records."""
+    records_csv_file = io.BytesIO(valid_storage_record_csv.encode("utf-8"))
+
+    data = {
+        "device_id": str(fake_db_storage_device.id),
+    }
+
+    storage_files = {"file": ("records.csv", records_csv_file, "text/csv")}
+
+    response = api_client.post(
+        "/storage/storage_charge_records",
+        files=storage_files,
+        data=data,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    print(response.text)
+
+    assert response.status_code == 201
+    response_data = response.json()
+    assert response_data["message"] == "Storage Charge Records submitted successfully."

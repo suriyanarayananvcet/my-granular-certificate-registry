@@ -41,7 +41,7 @@ def validate_user_role(user: User, required_role: UserRoles):
 
     # Assert that the user has the required role
     if user.role < required_role:
-        msg = f"User does not have the required role: {required_role}"
+        msg = f"User does not have the required role: {required_role}, was: {user.role}"
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=msg)
 
 

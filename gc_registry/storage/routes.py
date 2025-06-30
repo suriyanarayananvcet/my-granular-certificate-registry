@@ -27,10 +27,6 @@ from gc_registry.storage.schemas import (
     StorageRecordBase,
     StorageRecordQueryResponse,
 )
-from gc_registry.storage.services import (
-    get_allocated_storage_records_by_device_id,
-    get_device_ids_in_allocated_storage_records,
-)
 from gc_registry.storage.validation import validate_storage_records
 from gc_registry.user.models import User
 from gc_registry.user.validation import validate_user_access, validate_user_role
