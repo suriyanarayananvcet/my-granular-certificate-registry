@@ -1,5 +1,5 @@
 import os
-from typing import Generator
+from typing import Any, Callable, Generator
 
 import pytest
 from dotenv import load_dotenv
@@ -31,6 +31,7 @@ from gc_registry.device.models import Device
 from gc_registry.logging_config import logger
 from gc_registry.main import app
 from gc_registry.settings import settings
+from gc_registry.storage.models import AllocatedStorageRecord, StorageRecord
 from gc_registry.user.models import User, UserAccountLink
 from gc_registry.utils import ActiveRecord
 
@@ -232,113 +233,111 @@ def add_entity_to_write_and_read(
 
 
 @pytest.fixture()
-def fake_db_user(write_session: Session, read_session: Session) -> User:
-    user_dict = {
-        "name": "fake_user",
-        "email": "jake_fake@fakecorp.com",
-        "hashed_password": get_password_hash("password"),
-        "role": UserRoles.ADMIN,
-    }
+def user_factory(write_session: Session, read_session: Session) -> Any:
+    """Factory function to create users with different roles."""
 
-    user_write = User.model_validate(user_dict)
+    def _create_user(
+        role: UserRoles, name_suffix: str = "", email_prefix: str = "test_user"
+    ) -> ActiveRecord:
+        role_name = str(role)
+        unique_suffix = f"_{name_suffix}" if name_suffix else f"_{role_name}"
 
-    user_read = add_entity_to_write_and_read(user_write, write_session, read_session)
+        user_dict = {
+            "name": f"fake_user{unique_suffix}",
+            "email": f"{email_prefix}{unique_suffix}@fakecorp.com",
+            "hashed_password": get_password_hash("password"),
+            "role": role,
+        }
 
-    return user_read
+        user_write = User.model_validate(user_dict)
+        user_read = add_entity_to_write_and_read(
+            user_write, write_session, read_session
+        )
 
+        return user_read
 
-@pytest.fixture()
-def fake_db_user_2(write_session: Session, read_session: Session) -> User:
-    user_dict = {
-        "name": "fake_user_2",
-        "email": "jake_fake_2@fakecorp.com",
-        "hashed_password": get_password_hash("password"),
-        "role": UserRoles.ADMIN,
-    }
-
-    user_write = User.model_validate(user_dict)
-
-    user_read = add_entity_to_write_and_read(user_write, write_session, read_session)
-
-    return user_read
+    return _create_user
 
 
 @pytest.fixture()
-def fake_storage_validator_user(write_session: Session, read_session: Session) -> User:
-    user_dict = {
-        "name": "fake_storage_validator",
-        "email": "jake_fake_storage_validator@fakecorp.com",
-        "hashed_password": get_password_hash("password"),
-        "role": UserRoles.STORAGE_VALIDATOR,
-    }
+def account_factory(write_session: Session, read_session: Session) -> Any:
+    """Factory function to create accounts with a specific user."""
 
-    user_write = User.model_validate(user_dict)
+    def _create_account(user: User, name_suffix: str = "") -> ActiveRecord:
+        account_dict = {
+            "account_name": f"fake_account_{str(user.role)}{name_suffix}",
+            "user_ids": [user.id],
+            "users": [user],
+        }
+        account_write = Account.model_validate(account_dict)
 
-    user_read = add_entity_to_write_and_read(user_write, write_session, read_session)
+        account_read = add_entity_to_write_and_read(
+            account_write, write_session, read_session
+        )
 
-    return user_read
+        user_account_link = UserAccountLink.model_validate(
+            {"user_id": user.id, "account_id": account_read.id}
+        )
 
+        _ = add_entity_to_write_and_read(user_account_link, write_session, read_session)
 
-@pytest.fixture()
-def token(api_client, fake_db_user: User):
-    token = api_client.post(
-        "auth/login",
-        data={
-            "username": "jake_fake@fakecorp.com",
-            "password": "password",
-        },
-    )
+        return account_read
 
-    return token.json()["access_token"]
+    return _create_account
 
 
 @pytest.fixture()
-def token_storage_validator(
-    api_client: TestClient, fake_storage_validator_user: User
-) -> str:
-    token = api_client.post(
-        "auth/login",
-        data={
-            "username": "jake_fake_storage_validator@fakecorp.com",
-            "password": "password",
-        },
-    )
+def auth_factory(api_client: TestClient) -> Callable[[User], str]:
+    """Factory function to create authentication tokens for users."""
 
-    return token.json()["access_token"]
+    def _create_token(user: User) -> str:
+        response = api_client.post(
+            "auth/login",
+            data={
+                "username": user.email,
+                "password": "password",
+            },
+        )
+        return response.json()["access_token"]
+
+    return _create_token
 
 
 @pytest.fixture()
-def fake_db_account(
-    write_session: Session, read_session: Session, fake_db_user: User
-) -> Account:
-    account_dict = {
-        "account_name": "fake_account",
-        "user_ids": [fake_db_user.id],
-        "users": [fake_db_user],
-    }
-    account_write = Account.model_validate(account_dict)
+def fake_db_admin_user(user_factory) -> User:
+    """Create an admin user."""
+    return user_factory(UserRoles.ADMIN, "admin")
 
-    account_read = add_entity_to_write_and_read(
-        account_write, write_session, read_session
-    )
 
-    user_account_link = UserAccountLink.model_validate(
-        {"user_id": fake_db_user.id, "account_id": account_read.id}
-    )
+@pytest.fixture()
+def token(auth_factory, fake_db_admin_user: User) -> str:
+    """Get authentication token for admin user."""
+    return auth_factory(fake_db_admin_user)
 
-    _ = add_entity_to_write_and_read(user_account_link, write_session, read_session)
 
-    return account_read
+@pytest.fixture()
+def fake_storage_validator_user(user_factory) -> User:
+    return user_factory(UserRoles.STORAGE_VALIDATOR, "storage_validator")
+
+
+@pytest.fixture()
+def token_storage_validator(auth_factory, fake_storage_validator_user: User) -> str:
+    return auth_factory(fake_storage_validator_user)
+
+
+@pytest.fixture()
+def fake_db_account(account_factory: Any, fake_db_admin_user: User) -> Account:
+    return account_factory(fake_db_admin_user)
 
 
 @pytest.fixture()
 def fake_db_account_2(
-    write_session: Session, read_session: Session, fake_db_user: User
+    write_session: Session, read_session: Session, fake_db_admin_user: User
 ) -> Account:
     account_dict = {
         "account_name": "fake_account_2",
-        "user_ids": [fake_db_user.id],
-        "users": [fake_db_user],
+        "user_ids": [fake_db_admin_user.id],
+        "users": [fake_db_admin_user],
     }
     account_write = Account.model_validate(account_dict)
 
@@ -347,7 +346,7 @@ def fake_db_account_2(
     )
 
     user_account_link = UserAccountLink.model_validate(
-        {"user_id": fake_db_user.id, "account_id": account_read.id}
+        {"user_id": fake_db_admin_user.id, "account_id": account_read.id}
     )
 
     _ = add_entity_to_write_and_read(user_account_link, write_session, read_session)
@@ -614,3 +613,113 @@ def valid_storage_record_csv(fake_db_storage_device: Device) -> str:
 {fake_db_storage_device.id},true,2024-01-01T00:00:00,2024-01-01T01:00:00,1000.5,VAL001
 {fake_db_storage_device.id},false,2024-01-01T02:00:00,2024-01-01T03:00:00,850.0,VAL002"""
     return csv_content
+@pytest.fixture()
+def fake_db_storage_records(
+    write_session: Session,
+    read_session: Session,
+    fake_db_storage_device: Device,
+) -> list[StorageRecord]:
+    """Create fake storage records for testing."""
+    from gc_registry.storage.models import StorageRecord
+
+    storage_record_dicts = [
+        {
+            "device_id": fake_db_storage_device.id,
+            "is_charging": True,
+            "flow_start_datetime": "2024-01-01T00:00:00",
+            "flow_end_datetime": "2024-01-01T01:00:00",
+            "flow_energy": 1000.0,
+            "validator_id": 1,
+            "is_deleted": False,
+        },
+        {
+            "device_id": fake_db_storage_device.id,
+            "is_charging": False,
+            "flow_start_datetime": "2024-01-01T01:00:00",
+            "flow_end_datetime": "2024-01-01T02:00:00",
+            "flow_energy": -850.0,
+            "validator_id": 1,
+            "is_deleted": False,
+        },
+        {
+            "device_id": fake_db_storage_device.id,
+            "is_charging": True,
+            "flow_start_datetime": "2024-01-01T02:00:00",
+            "flow_end_datetime": "2024-01-01T03:00:00",
+            "flow_energy": 1200.0,
+            "validator_id": 1,
+            "is_deleted": False,
+        },
+        {
+            "device_id": fake_db_storage_device.id,
+            "is_charging": False,
+            "flow_start_datetime": "2024-01-01T03:00:00",
+            "flow_end_datetime": "2024-01-01T04:00:00",
+            "flow_energy": -1044.0,
+            "validator_id": 1,
+            "is_deleted": False,
+        },
+    ]
+
+    db_storage_records = []
+    for record_dict in storage_record_dicts:
+        storage_record = StorageRecord.model_validate(record_dict)
+        storage_record_read = add_entity_to_write_and_read(
+            storage_record, write_session, read_session
+        )
+        db_storage_records.append(storage_record_read)
+
+    return db_storage_records
+
+
+@pytest.fixture
+def fake_db_allocated_storage_records(
+    write_session: Session,
+    read_session: Session,
+    fake_db_storage_device: Device,
+    fake_db_granular_certificate_bundle: GranularCertificateBundle,
+    fake_db_storage_records: list[StorageRecord],
+) -> list[AllocatedStorageRecord]:
+    allocation_dicts = [
+        {
+            "device_id": fake_db_storage_device.id,
+            "granular_certificate_bundle_id": fake_db_granular_certificate_bundle.id,
+            "storage_efficiency_factor": 0.87,
+            "is_deleted": False,
+            "scr_allocation_id": fake_db_storage_records[0].id,
+            "sdr_allocation_id": fake_db_storage_records[1].id,
+            "sdr_proportion": 0.5,
+            "scr_allocation_methodology": "proportional",
+            "gc_allocation_id": fake_db_granular_certificate_bundle.id,
+            "sdgc_allocation_id": None,
+            "efficiency_factor_methodology": "measured",
+            "efficiency_factor_interval_start": "2024-01-01T00:00:00",
+            "efficiency_factor_interval_end": "2025-01-01T00:00:00",
+        },
+        {
+            "device_id": fake_db_storage_device.id,
+            "granular_certificate_bundle_id": fake_db_granular_certificate_bundle.id,
+            "storage_efficiency_factor": 0.87,
+            "is_deleted": False,
+            "scr_allocation_id": fake_db_storage_records[2].id,
+            "sdr_allocation_id": fake_db_storage_records[3].id,
+            "sdr_proportion": 0.3,
+            "scr_allocation_methodology": "proportional",
+            "gc_allocation_id": fake_db_granular_certificate_bundle.id,
+            "sdgc_allocation_id": None,
+            "efficiency_factor_methodology": "measured",
+            "efficiency_factor_interval_start": "2024-01-01T00:00:00",
+            "efficiency_factor_interval_end": "2025-01-01T00:00:00",
+        },
+    ]
+
+    db_storage_allocation_records = []
+    for allocation_dict in allocation_dicts:
+        allocation = AllocatedStorageRecord.model_validate(allocation_dict)
+
+        allocation_read = add_entity_to_write_and_read(
+            allocation, write_session, read_session
+        )
+        db_storage_allocation_records.append(allocation_read)
+
+    return db_storage_allocation_records
