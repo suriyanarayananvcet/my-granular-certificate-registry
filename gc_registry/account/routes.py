@@ -159,7 +159,7 @@ def get_whitelist(
     account_whitelist = read_session.exec(
         select(AccountWhitelistLink.source_account_id).where(
             AccountWhitelistLink.target_account_id == account_id,
-            AccountWhitelistLink.is_deleted == False,  # noqa: E712
+            ~AccountWhitelistLink.is_deleted,
         )
     ).all()
     return [
@@ -180,7 +180,7 @@ def get_whitelist_inverse(
     account_whitelist_inverse = read_session.exec(
         select(AccountWhitelistLink.target_account_id).where(
             AccountWhitelistLink.source_account_id == account_id,
-            AccountWhitelistLink.is_deleted == False,  # noqa: E712
+            ~AccountWhitelistLink.is_deleted,
         )
     ).all()
     return [

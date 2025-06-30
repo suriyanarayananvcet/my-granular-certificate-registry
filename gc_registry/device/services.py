@@ -55,7 +55,7 @@ def get_device_by_local_identifier(
     """Get a device by its local identifier."""
     query: SelectOfScalar = select(Device).where(
         Device.local_device_identifier == local_device_identifier,
-        not Device.is_deleted,
+        ~Device.is_deleted,
     )
 
     device = db_session.exec(query).first()

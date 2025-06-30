@@ -69,7 +69,7 @@ def get_allocated_storage_records_for_storage_record_id(
         AllocatedStorageRecord.scr_allocation_id
         == storage_record_id | AllocatedStorageRecord.sdr_allocation_id
         == storage_record_id,
-        not AllocatedStorageRecord.is_deleted,
+        ~AllocatedStorageRecord.is_deleted,
     )
 
     allocated_storage_records = read_session.exec(query).all()

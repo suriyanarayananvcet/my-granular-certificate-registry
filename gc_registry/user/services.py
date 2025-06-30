@@ -12,7 +12,7 @@ def get_users_by_account_id(
         .join(UserAccountLink)
         .where(
             UserAccountLink.account_id == account_id,
-            UserAccountLink.is_deleted == False,  # noqa: E712
+            ~UserAccountLink.is_deleted,
         )
     )
     users = read_session.exec(stmt).all()

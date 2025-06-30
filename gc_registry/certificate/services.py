@@ -685,7 +685,7 @@ def query_certificate_bundles(
     # certificates
     stmt: SelectOfScalar = select(GranularCertificateBundle).where(
         GranularCertificateBundle.account_id == certificate_query.source_id,
-        GranularCertificateBundle.is_deleted == False,  # noqa
+        ~GranularCertificateBundle.is_deleted,
     )
 
     exclude = {"user_id", "localise_time", "source_id"}
@@ -782,7 +782,7 @@ def transfer_certificates(
         select(AccountWhitelistLink.source_account_id).where(
             AccountWhitelistLink.target_account_id
             == certificate_bundle_action.target_id,
-            AccountWhitelistLink.is_deleted == False,  # noqa: E712
+            ~AccountWhitelistLink.is_deleted,
         )
     ).all()
     if certificate_bundle_action.source_id not in account_whitelist:

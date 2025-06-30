@@ -260,10 +260,12 @@ def certificate_bundle_cancellationfor_storage(
         read_session, certificate_cancel.storage_local_device_identifier
     )
 
+    print(f"Storage device: {storage_device}")
+
     if not storage_device:
         raise HTTPException(
             status_code=404,
-            detail="Storage device not found for the provided local identifier",
+            detail=f"Storage device not found for the provided local identifier: {certificate_cancel.storage_local_device_identifier}",
         )
 
     db_certificate_action = services.process_certificate_bundle_action(
