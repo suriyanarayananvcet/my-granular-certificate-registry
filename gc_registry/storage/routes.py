@@ -150,7 +150,7 @@ async def submit_storage_records(
 
 
 @router.post(
-    "/allocation_records",
+    "/allocated_storage_records",
     response_model=AllocatedStorageRecordSubmissionResponse,
     status_code=201,
 )

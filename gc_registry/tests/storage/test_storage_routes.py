@@ -74,7 +74,7 @@ def test_submit_storage_records_success(
     # Submit allocation records
     allocation_files = {"file": ("allocations.csv", allocations_csv_file, "text/csv")}
     response = api_client.post(
-        "/storage/allocation_records",
+        "/storage/allocated_storage_records",
         files=allocation_files,
         data=data,
         headers={"Authorization": f"Bearer {token_storage_validator}"},
@@ -105,7 +105,7 @@ def test_submit_storage_charge_records_success(
     storage_files = {"file": ("records.csv", records_csv_file, "text/csv")}
 
     response = api_client.post(
-        "/storage/storage_charge_records",
+        "/storage/storage_records",
         files=storage_files,
         data=data,
         headers={"Authorization": f"Bearer {token}"},
