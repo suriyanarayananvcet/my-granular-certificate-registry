@@ -21,7 +21,10 @@ class TestAuthRoutes:
         )
         assert response.status_code == 401
         assert response.json() == {
-            "detail": f"Password for '{fake_db_admin_user.email}' is incorrect."
+            "details": {},
+            "error_type": "http_error",
+            "message": f"Password for '{fake_db_admin_user.email}' is incorrect.",
+            "status_code": 401,
         }
 
         response = api_client.post(
@@ -29,4 +32,9 @@ class TestAuthRoutes:
             data={"username": "incorrect@wrong.com", "password": "password"},
         )
         assert response.status_code == 404
-        assert response.json() == {"detail": "User 'incorrect@wrong.com' not found."}
+        assert response.json() == {
+            "details": {},
+            "error_type": "http_error",
+            "message": "User 'incorrect@wrong.com' not found.",
+            "status_code": 404,
+        }

@@ -28,6 +28,14 @@ test:
 test.local:
 	poetry run pytest --cov-report term --cov-report html --cov=gc_registry
 
+.PHONY: test.local.until_fail
+test.local.until_fail:
+	poetry run pytest -x --cov-report term --cov-report html --cov=gc_registry
+
+.PHONY: test.local.until_fail_verbose
+test.local.until_fail_verbose:
+	poetry run pytest -x -vv --cov-report term --cov-report html --cov=gc_registry > test_results.md
+
 .PHONY: workflow
 workflow:
 	poetry run pytest

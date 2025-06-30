@@ -167,16 +167,14 @@ def issuance_id_to_device_and_interval(
 def get_max_certificate_id_by_device_id(
     db_session: Session, device_id: int
 ) -> int | None:
-    """Gets the maximum certificate ID from any bundle for a given device, excluding any withdrawn certificates
+    """Gets the maximum certificate ID from any bundle for a given device, excluding any withdrawn certificates.
 
     Args:
         db_session (Session): The database session
         device_id (int): The device ID
 
     Returns:
-        int: The maximum certificate ID
-
-
+        int | None: The maximum certificate ID
     """
 
     stmt: SelectOfScalar = select(

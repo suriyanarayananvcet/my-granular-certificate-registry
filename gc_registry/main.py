@@ -1,11 +1,12 @@
 import datetime
 import logging
-import os
 import secrets
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Callable
+from typing import AsyncGenerator, Callable
 
 from fastapi import Depends, FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import HTTPBearer
@@ -14,12 +15,18 @@ from markdown import markdown
 from pyinstrument import Profiler
 from pyinstrument.renderers.html import HTMLRenderer
 from pyinstrument.renderers.speedscope import SpeedscopeRenderer
+from starlette.exceptions import HTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
 from .account.routes import router as account_router
 from .authentication.routes import router as auth_router
 from .certificate.routes import router as certificate_router
 from .core.database.db import get_db_name_to_client
+from .core.error_handling import (
+    general_exception_handler,
+    http_exception_handler,
+    validation_exception_handler,
+)
 from .core.models.base import LoggingLevelRequest
 from .device.routes import router as device_router
 from .logging_config import logger, set_logger_and_children_level
@@ -62,6 +69,36 @@ tags_metadata = [
     },
 ]
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """
+    Lifespan context manager for FastAPI application.
+    Handles startup and shutdown events.
+    """
+    logger.info("Starting up application...")
+
+    try:
+        # TODO: Initialize database connections
+        logger.info("Application startup complete")
+        yield
+
+    except Exception as e:
+        logger.error(f"Error during application startup: {str(e)}")
+        raise
+
+    finally:
+        logger.info("Shutting down application...")
+
+        try:
+            # TODO: Close database connections
+            logger.info("Application shutdown complete")
+
+        except Exception as e:
+            logger.error(f"Error during application shutdown: {str(e)}")
+            raise
+
+
 app = FastAPI(
     openapi_tags=tags_metadata,
     title="Energy Tag API Specification",
@@ -73,9 +110,8 @@ app = FastAPI(
     },
     docs_url="/docs",
     dependencies=[Depends(get_db_name_to_client)],
+    lifespan=lifespan,
 )
-
-FRONTEND_URL = os.getenv("FRONTEND_URL", "localhost:9000")
 
 
 class CSRFMiddleware:
@@ -150,6 +186,18 @@ app.add_middleware(
 app.add_middleware(SessionMiddleware, secret_key=settings.MIDDLEWARE_SECRET_KEY)
 
 
+# Register exception handlers
+app.add_exception_handler(RequestValidationError, validation_exception_handler)  # type: ignore
+app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore
+app.add_exception_handler(Exception, general_exception_handler)  # type: ignore
+
+
+# Assemble fastapi loggers
+uvicorn_logger = logging.getLogger("uvicorn")
+uvicorn_access_logger = logging.getLogger("uvicorn.access")
+fastapi_logger = logging.getLogger("fastapi")
+
+
 @app.get("/csrf-token", tags=["Core"])
 async def get_csrf_token(request: Request, response: Response):
     token = secrets.token_urlsafe(32)
@@ -216,12 +264,6 @@ async def read_root(request: Request):
     }
 
     return templates.TemplateResponse("index.jinja", params)
-
-
-# Assemble fastapi loggers
-uvicorn_logger = logging.getLogger("uvicorn")
-uvicorn_access_logger = logging.getLogger("uvicorn.access")
-fastapi_logger = logging.getLogger("fastapi")
 
 
 @app.post("/change_log_level", tags=["Core"])

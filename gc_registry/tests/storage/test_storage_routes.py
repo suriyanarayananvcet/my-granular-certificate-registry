@@ -141,8 +141,12 @@ def test_get_allocated_storage_records_invalid_date_range_order(
         headers={"Authorization": f"Bearer {token_storage_validator}"},
     )
 
-    assert response.status_code == 400
-    assert "created_after must be before created_before" in response.json()["detail"]
+    assert response.json() == {
+        "status_code": 400,
+        "message": "created_after must be before created_before.",
+        "details": {},
+        "error_type": "http_error",
+    }
 
 
 def test_get_allocated_storage_records_date_range_too_large(
@@ -165,8 +169,12 @@ def test_get_allocated_storage_records_date_range_too_large(
         headers={"Authorization": f"Bearer {token_storage_validator}"},
     )
 
-    assert response.status_code == 400
-    assert "Date range cannot exceed 30 days" in response.json()["detail"]
+    assert response.json() == {
+        "status_code": 400,
+        "message": "Date range cannot exceed 30 days.",
+        "details": {},
+        "error_type": "http_error",
+    }
 
 
 @pytest.mark.parametrize(
@@ -203,7 +211,9 @@ def test_unauthorized_user_role_access_denied(
 
     print(response.text)
     assert response.status_code == 403
-    assert (
-        "User must be an Admin, Production or Storage Validator"
-        in response.json()["detail"]
-    )
+    assert response.json() == {
+        "status_code": 403,
+        "message": "User must be an Admin, Production or Storage Validator to perform this action.",
+        "details": {},
+        "error_type": "http_error",
+    }
