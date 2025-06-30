@@ -1,3 +1,4 @@
+import datetime
 import os
 from typing import Any, Callable, Generator
 
@@ -304,6 +305,54 @@ def auth_factory(api_client: TestClient) -> Callable[[User], str]:
 
 
 @pytest.fixture()
+def generic_import_account(write_session: Session, read_session: Session) -> Account:
+    """Create the generic import account."""
+    account_dict = {
+        "account_name": "Import Account",
+        "user_ids": [],
+    }
+
+    account_write = Account.model_validate(account_dict)
+
+    account_read = add_entity_to_write_and_read(
+        account_write, write_session, read_session
+    )
+
+    return account_read
+
+
+@pytest.fixture()
+def generic_import_device(
+    write_session: Session,
+    read_session: Session,
+    generic_import_account: Account,
+) -> Device:
+    """Create the generic import device."""
+    device_dict = {
+        "account_id": generic_import_account.id,
+        "device_name": "Import Device",
+        "local_device_identifier": "GENERIC_IMPORT_DEVICE",
+        "grid": "N/A",
+        "energy_source": EnergySourceType.other,
+        "technology_type": DeviceTechnologyType.other,
+        "operational_date": "2020-01-01",
+        "capacity": 0,
+        "peak_demand": 0,
+        "location": "N/A",
+        "is_storage": False,
+        "is_deleted": False,
+    }
+
+    device_write = Device.model_validate(device_dict)
+
+    device_read = add_entity_to_write_and_read(
+        device_write, write_session, read_session
+    )
+
+    return device_read
+
+
+@pytest.fixture()
 def fake_db_admin_user(user_factory) -> User:
     """Create an admin user."""
     return user_factory(UserRoles.ADMIN, "admin")
@@ -392,7 +441,6 @@ def fake_db_wind_device(
         "capacity": 3000,
         "account_id": fake_db_account.id,
         "location": "USA",
-        "commissioning_date": "2020-01-01",
         "operational_date": "2020-01-01",
         "peak_demand": 100,
         "is_storage": False,
