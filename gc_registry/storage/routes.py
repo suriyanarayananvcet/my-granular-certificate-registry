@@ -6,12 +6,11 @@ import pandas as pd
 from esdbclient import EventStoreDBClient
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from gc_registry.account.services import get_accounts_by_user_id
 from gc_registry.authentication.services import get_current_user
 from gc_registry.certificate.models import GranularCertificateBundle
-from gc_registry.certificate.schemas import GranularCertificateBundleCreate
 from gc_registry.core.database import db, events
 from gc_registry.core.models.base import UserRoles
 from gc_registry.device.models import Device
@@ -31,6 +30,7 @@ from gc_registry.storage.services import (
     create_charge_records_from_metering_data,
     get_allocated_storage_records_by_device_id,
     get_device_ids_in_allocated_storage_records,
+    issue_sdgcs_against_allocated_records,
 )
 from gc_registry.storage.validation import validate_storage_records
 from gc_registry.user.models import User
@@ -220,6 +220,62 @@ async def create_storage_allocation(
 
 
 @router.post(
+    "/issue_sdgcs",
+    response_model=list[GranularCertificateBundle],
+    status_code=200,
+)
+def issue_SDGCs(
+    allocated_storage_record_ids: list[int],
+    current_user: User = Depends(get_current_user),
+    write_session: Session = Depends(db.get_write_session),
+    read_session: Session = Depends(db.get_read_session),
+    esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
+):
+    """A GC Bundle that has been issued following the verification of a cancelled GC Bundle and the proper allocation of a pair
+    of Storage Charge and Discharge Records. The GC Bundle is issued to the Account of the Storage Device, and is identical to
+    a GC Bundle issued to a production Device albeit with additional storage-specific attributes as described in the Standard.
+    These bundles can be queried using the same GC Bundle query endpoint as regular GC Bundles, but with the additional option to filter
+    by the storage_id and the discharging_start_datetime, which is inherited from the allocated SDR.
+    """
+    if current_user.role != UserRoles.STORAGE_VALIDATOR:
+        validate_user_role(current_user, required_role=UserRoles.PRODUCTION_USER)
+
+    try:
+        # Retrieve the allocated storage records
+        allocated_storage_records = read_session.exec(
+            select(AllocatedStorageRecord).where(
+                AllocatedStorageRecord.id.in_(allocated_storage_record_ids)  # type: ignore
+            )
+        ).all()
+
+        # Assert allocation records for a single device have been submitted
+        device_ids = [record.device_id for record in allocated_storage_records]
+        if len(device_ids) != 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Allocation records must be for a single device.",
+            )
+        device_id = device_ids[0]
+        device = Device.by_id(device_id, read_session)
+
+        # Assert the user has access to the specified device
+        validate_user_access(current_user, device.account_id, read_session)
+
+        issued_sdgcs = issue_sdgcs_against_allocated_records(
+            allocated_storage_record_ids=allocated_storage_record_ids,
+            device=device,
+            account_id=device.account_id,
+            write_session=write_session,
+            read_session=read_session,
+            esdb_client=esdb_client,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return issued_sdgcs
+
+
+@router.post(
     "/withdraw_scr",
     response_model=StorageActionResponse,
     status_code=200,
@@ -257,33 +313,6 @@ def SDR_withdraw(
     )
 
     return sdr_action
-
-
-@router.post(
-    "/issue_sdgc",
-    response_model=GranularCertificateBundle,
-    status_code=200,
-)
-def issue_SDGC(
-    sdgc_create: GranularCertificateBundleCreate,
-    current_user: User = Depends(get_current_user),
-    write_session: Session = Depends(db.get_write_session),
-    read_session: Session = Depends(db.get_read_session),
-    esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
-):
-    """A GC Bundle that has been issued following the verification of a cancelled GC Bundle and the proper allocation of a pair
-    of Storage Charge and Discharge Records. The GC Bundle is issued to the Account of the Storage Device, and is identical to
-    a GC Bundle issued to a production Device albeit with additional storage-specific attributes as described in the Standard.
-
-    These bundles can be queried using the same GC Bundle query endpoint as regular GC Bundles, but with the additional option to filter
-    by the storage_id and the discharging_start_datetime, which is inherited from the allocated SDR.
-    """
-
-    sdgc = GranularCertificateBundle.create(
-        sdgc_create, write_session, read_session, esdb_client
-    )
-
-    return sdgc
 
 
 @router.get(
