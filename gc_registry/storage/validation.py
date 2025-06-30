@@ -1,10 +1,31 @@
 import pandas as pd
-from sqlmodel import Session
+from sqlmodel import Session, desc, select
+from sqlmodel.sql.expression import SelectOfScalar
 
 from gc_registry.certificate.models import GranularCertificateBundle
 from gc_registry.settings import settings
 from gc_registry.storage.models import AllocatedStorageRecord, StorageRecord
-from gc_registry.storage.services import get_latest_storage_record_by_device_id
+
+
+def get_latest_storage_record_by_device_id(
+    device_id: int,
+    read_session: Session,
+) -> StorageRecord | None:
+    """Retrieve the latest Storage Record for the specified device."""
+
+    # Query the database for the latest allocated storage record for the specified device
+    query: SelectOfScalar = (
+        select(StorageRecord)
+        .where(
+            AllocatedStorageRecord.device_id == device_id,
+        )
+        .order_by(desc(StorageRecord.flow_start_datetime))
+        .limit(1)
+    )
+
+    latest_record = read_session.exec(query).first()
+
+    return latest_record
 
 
 def validate_storage_records(
