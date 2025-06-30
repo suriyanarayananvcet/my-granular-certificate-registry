@@ -54,40 +54,43 @@ def test_submit_storage_records_success(
     # Submit storage records
     storage_files = {"file": ("records.csv", records_csv_file, "text/csv")}
 
-    assert storage_files
-    assert data
-    assert allocations_csv_file
+    response = api_client.post(
+        "/storage/submit_storage_records",
+        files=storage_files,
+        data=data,
+        headers={"Authorization": f"Bearer {token_storage_validator}"},
+    )
 
-    # response = api_client.post(
-    #     "/storage/submit_storage_records",
-    #     files=storage_files,
-    #     data=data,
-    #     headers={"Authorization": f"Bearer {token_storage_validator}"},
-    # )
+    print(response.text)
 
-    # print(response.text)
+    assert response.status_code == 201
+    response_data = response.json()
+    assert response_data["message"] == "Storage records created successfully."
+    assert response_data["total_charge_energy"] == 3700
+    assert response_data["total_discharge_energy"] == 1600
+    assert response_data["total_energy"] == 5300
+    assert response_data["total_records"] == 5
 
-    # assert response.status_code == 201
-    # response_data = response.json()
-    # assert response_data["message"] == "Storage records created successfully."
-    # assert response_data["total_charge_energy"] == 3700
-    # assert response_data["total_discharge_energy"] == 1600
-    # assert response_data["total_energy"] == 5300
-    # assert response_data["total_records"] == 5
+    # Submit allocation records
+    allocation_files = {"file": ("allocations.csv", allocations_csv_file, "text/csv")}
+    response = api_client.post(
+        "/storage/submit_allocation_records",
+        files=allocation_files,
+        data=data,
+        headers={"Authorization": f"Bearer {token_storage_validator}"},
+    )
 
-    # # Submit allocation records
-    # allocation_files = {"file": ("allocations.csv", allocations_csv_file, "text/csv")}
-    # response = api_client.post(
-    #     "/storage/submit_allocation_records",
-    #     files=allocation_files,
-    #     data=data,
-    #     headers={"Authorization": f"Bearer {token_storage_validator}"},
-    # )
+    print(response.text)
 
     # assert response.status_code == 201
     # response_data = response.json()
     # assert response_data["message"] == "Allocation records created successfully."
     # assert response_data["total_records"] == 2
+
+    assert response.status_code == 201
+    response_data = response.json()
+    assert response_data["message"] == "Allocation records created successfully."
+    assert response_data["total_records"] == 2
 
 
 def test_get_allocated_storage_records_by_device_id(
