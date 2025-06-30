@@ -60,43 +60,82 @@ from gc_registry.user.validation import (
 router = APIRouter(tags=["Storage"])
 
 
-@router.post("/storage_charge_records", response_model=MeasurementSubmissionResponse)
-async def submit_storage_charge_records(
+@router.get("/storage_readings_template", response_class=FileResponse)
+def get_storage_readings_template(current_user: User = Depends(get_current_user)):
+    """Return the CSV template for storage readings submission."""
+    template_path = (
+        Path(__file__).parent.parent
+        / "static"
+        / "templates"
+        / "storage_readings_template.csv"
+    )
+
+    if not template_path.exists():
+        raise HTTPException(status_code=404, detail="Template file not found.")
+
+    return FileResponse(
+        path=template_path,
+        filename="meter_readings_template.csv",
+        media_type="text/csv",
+    )
+
+
+@router.get("/storage_allocation_template", response_class=FileResponse)
+def get_storage_allocation_template(current_user: User = Depends(get_current_user)):
+    """Return the CSV template for storage allocation submission."""
+    template_path = (
+        Path(__file__).parent.parent
+        / "static"
+        / "templates"
+        / "storage_allocation_template.csv"
+    )
+
+    if not template_path.exists():
+        raise HTTPException(status_code=404, detail="Template file not found.")
+
+    return FileResponse(
+        path=template_path,
+        filename="storage_allocation_template.csv",
+        media_type="text/csv",
+    )
+
+
+@router.post(
+    "/storage_records",
+    response_model=StorageRecordSubmissionResponse,
+    status_code=201,
+)
+async def submit_storage_records(
     file: UploadFile = File(...),
     device_id: int = Form(...),
     current_user: User = Depends(get_current_user),
     write_session: Session = Depends(db.get_write_session),
     read_session: Session = Depends(db.get_read_session),
     esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
-):
-    """Submit meter readings as a CSV file for a single device,
-    creating a MeasurementReport for each production interval against which GC
-    Bundles can be issued. Returns a summary of the readings submitted.
+) -> StorageRecordSubmissionResponse:
+    """Submit a list of Storage Records to the registry."""
 
-    Until an issuance metadata workflow is implemented, the submission will use a
-    default set of issuance metadata. In the front end, this will be implemented as
-    a dialogue box that presents the user with the default metadata values, and allow
-    them to edit them if desired at the point of issuance.
+    # Can be performed by both Storage Device owners and Storage Validators
+    if current_user.role != UserRoles.STORAGE_VALIDATOR:
+        validate_user_role(current_user, required_role=UserRoles.PRODUCTION_USER)
 
-    Args:
-        file (UploadFile): The CSV file containing meter readings
-        device_id (int): The ID of the device the readings are for
+    try:
+        # Read the uploaded file
+        contents = await file.read()
+        csv_file = io.StringIO(contents.decode("utf-8"))
 
-    Returns:
-        models.MeasurementSubmissionResponse: A summary of the readings submitted.
-    """
-    validate_user_role(current_user, required_role=UserRoles.PRODUCTION_USER)
+        # Convert to DataFrame
+        df = pd.read_csv(csv_file)
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=400, detail=f"Error reading CSV file: {str(e)}"
+        )
 
-    # Read the uploaded file
-    contents = await file.read()
-    csv_file = io.StringIO(contents.decode("utf-8"))
-
-    # Convert to DataFrame
-    df = pd.read_csv(csv_file)
     df["device_id"] = device_id
 
-    # Check that the device ID is associated with an account that the user has access to
-    device = get_device_by_id(read_session,device_id)
+    device = get_device_by_id(read_session, device_id)
+    logger.info(f"Device: {device}")
 
     if not device:
         raise HTTPException(
@@ -107,57 +146,94 @@ async def submit_storage_charge_records(
         raise HTTPException(
             status_code=400, detail=f"Device with ID {device_id} is not a storage device."
         )
-
-    validate_user_access(current_user, device.account_id, read_session)
-
+    
     passed, message = validate_storage_records(df, read_session, device_id)
     if not passed:
         raise HTTPException(
             status_code=400, detail=f"Invalid measurement data: {message}"
         )
-    
-    df['is_charging'] = df.flow_energy > 0
 
-    storage_records = StorageRecord.create(
-        df.to_dict(orient="records"),
+    validate_user_access(current_user, device.account_id, read_session)
+
+    # Create the storage records
+    storage_submission_response = create_charge_records_from_metering_data(
+        df,
         write_session,
         read_session,
         esdb_client,
     )
 
-    if not storage_records:
-        raise HTTPException(
-            status_code=500, detail="Could not create measurement reports."
-        )
-    
-    # Create a MeasurementReport for the submitted storage records
-    measurement_response = MeasurementSubmissionResponse(
-        message="Storage Charge Records submitted successfully.",
-        first_reading_datetime=df.flow_start_datetime.min(),
-        last_reading_datetime=df.flow_start_datetime.max(),
-        total_device_usage= int(df.interval_usage.sum()),
-    )
+    return StorageRecordSubmissionResponse.model_validate(storage_submission_response)
 
-    return measurement_response
 
-@router.get(
-    "/query_storage_record",
-    response_model=StorageRecordQueryResponse,
-    status_code=200,
+@router.post(
+    "/allocation_records",
+    response_model=AllocatedStorageRecordSubmissionResponse,
+    status_code=201,
 )
-def query_SCR(
-    scr_query: StorageAction,
+async def create_storage_allocation(
+    file: UploadFile = File(...),
+    device_id: int = Form(...),
     current_user: User = Depends(get_current_user),
     write_session: Session = Depends(db.get_write_session),
     read_session: Session = Depends(db.get_read_session),
     esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
-):
-    """Return all storage records from the specified Account that match the provided search criteria."""
-    scr_action = StorageAction.create(
-        scr_query, write_session, read_session, esdb_client
+) -> AllocatedStorageRecordSubmissionResponse:
+    """Storage Validator Only: Submit a list of Allocated Storage Records to the registry.
+
+    This endpoint depends on there being existing validated Storage Charge/Discharge Records
+    that have been submitted for the specified device.
+    """
+    validate_user_role_for_storage_validator(current_user)
+
+    try:
+        # Read the uploaded file
+        contents = await file.read()
+        csv_file = io.StringIO(contents.decode("utf-8"))
+
+        # Convert to DataFrame and replace NaN values with None
+        allocated_storage_records_df = pd.read_csv(csv_file, keep_default_na=False)
+        allocated_storage_records_df["device_id"] = device_id
+
+        # Check that the device ID is associated with an account that the user has access to
+        device = Device.by_id(device_id, read_session)
+
+        logger.info(f"Device: {device}")
+
+        if not device:
+            raise HTTPException(
+                status_code=404, detail=f"Device with ID {device_id} not found."
+            )
+        if not device.is_storage:
+            raise HTTPException(
+                status_code=400, detail=f"Device with ID {device_id} is not a storage device."
+            )
+
+        validate_user_access(current_user, device.account_id, read_session)
+
+        # Create the allocated storage records
+        allocated_storage_records = (
+            create_allocated_storage_records_from_submitted_data(
+                allocated_storage_records_df,
+                write_session,
+                read_session,
+                esdb_client,
+            )
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not allocated_storage_records:
+        raise HTTPException(
+            status_code=400,
+            detail="No valid allocated storage records were created from the submitted data.",
+        )
+
+    return AllocatedStorageRecordSubmissionResponse(
+        total_records=len(allocated_storage_records),
+        message="Allocation records created successfully.",
     )
 
-    return scr_action
 
 
 @router.post(
@@ -309,3 +385,8 @@ def get_allocated_storage_records(
     )
 
     return allocated_storage_records
+
+
+
+
+
