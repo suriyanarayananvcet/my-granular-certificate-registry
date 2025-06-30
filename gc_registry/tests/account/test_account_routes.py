@@ -5,6 +5,7 @@ from sqlmodel.sql.expression import SelectOfScalar
 from gc_registry.account.models import Account
 from gc_registry.account.schemas import AccountUpdate, AccountWhitelist
 from gc_registry.certificate.models import GranularCertificateBundle
+from gc_registry.core.models.base import UserRoles
 from gc_registry.device.models import Device
 from gc_registry.user.models import User, UserAccountLink
 
@@ -161,7 +162,7 @@ class TestAccountRoutes:
         self,
         api_client: TestClient,
         fake_db_account: Account,
-        fake_db_user: User,
+        fake_db_admin_user: User,
         token: str,
     ):
         # Test getting all devices by account ID
@@ -171,7 +172,7 @@ class TestAccountRoutes:
         )
         print(response.json())
         assert response.status_code == 200
-        assert response.json()[0]["email"] == "jake_fake@fakecorp.com"
+        assert response.json()[0]["email"] == "test_user_admin@fakecorp.com"
 
     def test_get_whitelist_inverse(
         self,
@@ -203,7 +204,7 @@ class TestAccountRoutes:
         token: str,
         fake_db_granular_certificate_bundle: GranularCertificateBundle,
         fake_db_granular_certificate_bundle_2: GranularCertificateBundle,
-        fake_db_user: User,
+        fake_db_admin_user: User,
         fake_db_account: Account,
     ):
         # Test case 1: Try to query a certificate with correct parameters
@@ -230,7 +231,7 @@ class TestAccountRoutes:
         token: str,
         fake_db_granular_certificate_bundle: GranularCertificateBundle,
         fake_db_wind_device: Device,
-        fake_db_user: User,
+        fake_db_admin_user: User,
         fake_db_account: Account,
     ):
         response = api_client.get(
@@ -248,14 +249,21 @@ class TestAccountRoutes:
         api_client: TestClient,
         token: str,
         fake_db_account: Account,
-        fake_db_user: User,
-        fake_db_user_2: User,
+        fake_db_admin_user: User,
         read_session: Session,
+        user_factory,
     ):
         """Test that the users for an account can be updated via their FastAPI routes."""
 
+        fake_db_user_2: User = user_factory(UserRoles.ADMIN, "special_case")
+
+        assert fake_db_admin_user.id is not None
+        assert fake_db_user_2.id is not None
+
         # Add fake_db_user_2 to fake_db_account
-        updated_account = AccountUpdate(user_ids=[fake_db_user.id, fake_db_user_2.id])  # type: ignore
+        updated_account = AccountUpdate(
+            user_ids=[fake_db_admin_user.id, fake_db_user_2.id]
+        )  # type: ignore
 
         response = api_client.patch(
             f"account/update/{fake_db_account.id}",
@@ -264,7 +272,7 @@ class TestAccountRoutes:
         )
 
         assert response.status_code == 200
-        assert response.json()["user_ids"] == [fake_db_user.id, fake_db_user_2.id]
+        assert response.json()["user_ids"] == [fake_db_admin_user.id, fake_db_user_2.id]
 
         # Check the user account link table to see that the users have been added
         stmt: SelectOfScalar = select(UserAccountLink).where(
@@ -272,11 +280,11 @@ class TestAccountRoutes:
         )
         user_account_links = read_session.exec(stmt).all()
         assert len(user_account_links) == 2
-        assert user_account_links[0].user_id == fake_db_user.id
+        assert user_account_links[0].user_id == fake_db_admin_user.id
         assert user_account_links[1].user_id == fake_db_user_2.id
 
         # Remove fake_db_user_2 from fake_db_account
-        updated_account = AccountUpdate(user_ids=[fake_db_user.id])
+        updated_account = AccountUpdate(user_ids=[fake_db_admin_user.id])
 
         response = api_client.patch(
             f"account/update/{fake_db_account.id}",
@@ -285,7 +293,7 @@ class TestAccountRoutes:
         )
 
         assert response.status_code == 200
-        assert response.json()["user_ids"] == [fake_db_user.id]
+        assert response.json()["user_ids"] == [fake_db_admin_user.id]
 
         # Check the user account link table to see that the users have been removed
         stmt_2: SelectOfScalar = select(UserAccountLink).where(
@@ -293,4 +301,4 @@ class TestAccountRoutes:
         )
         user_account_links = read_session.exec(stmt_2).all()
         assert len(user_account_links) == 1
-        assert user_account_links[0].user_id == fake_db_user.id
+        assert user_account_links[0].user_id == fake_db_admin_user.id

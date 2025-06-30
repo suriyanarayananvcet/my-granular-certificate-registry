@@ -25,7 +25,7 @@ class TestCQRS:
         read_session: Session,
         fake_db_wind_device: Device,
         fake_db_account: Account,
-        fake_db_user: User,
+        fake_db_admin_user: User,
         esdb_client: EventStoreDBClient,
     ):
         device_dict = {
@@ -52,7 +52,7 @@ class TestCQRS:
         # wind_device.device_name = None
         wind_device.device_name = "fake_wind_device 2"
 
-        user_dict = fake_db_user.model_dump()
+        user_dict = fake_db_admin_user.model_dump()
         user_dict["name"] = "fake_user_2"
         user_dict["id"] = None
         user_dict["email"] = "fake_email@fea.com"
@@ -95,12 +95,12 @@ class TestCQRS:
         if wind_device is not None:
             assert wind_device == fake_db_wind_device
 
-        assert fake_db_user.id is not None
+        assert fake_db_admin_user.id is not None
         user = read_session.exec(
-            select(User).filter(User.id == fake_db_user.id)  # type: ignore
+            select(User).filter(User.id == fake_db_admin_user.id)  # type: ignore
         ).first()
         if user is not None:
-            assert user == fake_db_user
+            assert user == fake_db_admin_user
 
     def test_update_entity(
         self,

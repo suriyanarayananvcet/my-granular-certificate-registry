@@ -28,7 +28,7 @@ class TestCertificateServices:
         assert account_summary["energy_by_fuel_type"] == {"wind": 1000}
 
     def test_get_users_by_account_id(
-        self, read_session: Session, fake_db_account: Account, fake_db_user: User
+        self, read_session: Session, fake_db_account: Account, fake_db_admin_user: User
     ):
         assert fake_db_account is not None
         assert fake_db_account.id is not None

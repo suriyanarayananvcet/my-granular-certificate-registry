@@ -13,7 +13,7 @@ from gc_registry.user.models import User
 def test_transfer_certificate(
     api_client: TestClient,
     fake_db_granular_certificate_bundle: GranularCertificateBundle,
-    fake_db_user: User,
+    fake_db_admin_user: User,
     fake_db_account: Account,
     fake_db_account_2: Account,
     token: str,
@@ -24,7 +24,7 @@ def test_transfer_certificate(
     # Test case 1: Try to transfer a certificate without target_id
     test_data_1: dict[str, Any] = {
         "granular_certificate_bundle_ids": [fake_db_granular_certificate_bundle.id],
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
         "source_id": fake_db_account.id,
     }
 
@@ -78,7 +78,7 @@ def test_transfer_certificate(
 
     test_data_2: dict[str, Any] = {
         "granular_certificate_bundle_ids": [fake_db_granular_certificate_bundle.id],
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
         "source_id": fake_db_account.id,
         "target_id": fake_db_account_2.id,
     }
@@ -94,7 +94,7 @@ def test_transfer_certificate(
     # Test case 4: Try to transfer a fraction of a certificate
     test_data_3: dict[str, Any] = {
         "granular_certificate_bundle_ids": [fake_db_granular_certificate_bundle.id],
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
         "source_id": fake_db_account_2.id,
         "target_id": fake_db_account.id,
         "certificate_bundle_percentage": 0.75,
@@ -112,7 +112,7 @@ def test_transfer_certificate(
 
     test_data_4: dict[str, Any] = {
         "granular_certificate_bundle_ids": [fake_db_granular_certificate_bundle.id],
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
         "source_id": fake_db_account.id,
         "target_id": fake_db_account_2.id,
         "certificate_bundle_percentage": 1.5,
@@ -134,7 +134,7 @@ def test_transfer_certificate(
     # Test case 6: Try to specify the action type
     test_data_5: dict[str, Any] = {
         "granular_certificate_bundle_ids": [fake_db_granular_certificate_bundle.id],
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
         "source_id": fake_db_account.id,
         "target_id": fake_db_account.id,
         "certificate_bundle_percentage": 0.5,
@@ -160,12 +160,12 @@ def test_cancel_certificate_no_source_id(
     api_client: TestClient,
     token: str,
     fake_db_granular_certificate_bundle: GranularCertificateBundle,
-    fake_db_user: User,
+    fake_db_admin_user: User,
 ):
     # Test case 1: Try to cancel a certificate without source_id
     test_data_1: dict[str, Any] = {
         "granular_certificate_bundle_ids": [fake_db_granular_certificate_bundle.id],
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
     }
 
     response = api_client.post(
@@ -184,13 +184,13 @@ def test_cancel_certificate_successfully(
     api_client: TestClient,
     token: str,
     fake_db_granular_certificate_bundle: GranularCertificateBundle,
-    fake_db_user: User,
+    fake_db_admin_user: User,
     fake_db_account: Account,
 ):
     # Test case 2: Cancel a certificate successfully
     test_data_2: dict[str, Any] = {
         "granular_certificate_bundle_ids": [fake_db_granular_certificate_bundle.id],
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
         "source_id": fake_db_account.id,
     }
 
@@ -207,13 +207,13 @@ def test_cancel_certificate_fraction(
     api_client: TestClient,
     token: str,
     fake_db_granular_certificate_bundle: GranularCertificateBundle,
-    fake_db_user: User,
+    fake_db_admin_user: User,
     fake_db_account: Account,
 ):
     # Test case 3: Try to cancel a fraction of a certificate
     test_data_3: dict[str, Any] = {
         "granular_certificate_bundle_ids": [fake_db_granular_certificate_bundle.id],
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
         "source_id": fake_db_account.id,
         "certificate_bundle_percentage": 0.35,
     }
@@ -229,7 +229,7 @@ def test_cancel_certificate_fraction(
     # Test case 4: Try to cancel a certificate with invalid percentage
     test_data_4: dict[str, Any] = {
         "granular_certificate_bundle_ids": [fake_db_granular_certificate_bundle.id],
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
         "source_id": fake_db_account.id,
         "certificate_bundle_percentage": 0,
     }
@@ -251,17 +251,17 @@ def test_query_certificate_bundles(
     token: str,
     fake_db_granular_certificate_bundle: GranularCertificateBundle,
     fake_db_granular_certificate_bundle_2: GranularCertificateBundle,
-    fake_db_user: User,
+    fake_db_admin_user: User,
     fake_db_account: Account,
 ):
     assert fake_db_granular_certificate_bundle.id is not None
-    assert fake_db_user.id is not None
+    assert fake_db_admin_user.id is not None
     assert fake_db_account.id is not None
 
     # Test case 1: Try to query a certificate with correct parameters
     test_data_1: dict[str, Any] = {
         "source_id": fake_db_account.id,
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
     }
 
     response = api_client.post(
@@ -280,7 +280,7 @@ def test_query_certificate_bundles(
 
     # Test case 2: Try to query a certificate with missing source_id
     test_data_2: dict[str, Any] = {
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
     }
 
     response = api_client.post(
@@ -301,7 +301,7 @@ def test_query_certificate_bundles(
             create_issuance_id(fake_db_granular_certificate_bundle_2),
         ],
         "source_id": fake_db_account.id,
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
     }
 
     response = api_client.post(
@@ -326,7 +326,7 @@ def test_query_certificate_bundles(
     test_data_4: dict[str, Any] = {
         "issuance_ids": ["123-12-03-01 12:12:12"],
         "source_id": fake_db_account.id,
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
     }
 
     response = api_client.post(
@@ -342,7 +342,7 @@ def test_query_certificate_bundles(
     # Test case 5: Query certificates with invalid certificate_period_start and certificate_period_end
     test_data_5: dict[str, Any] = {
         "source_id": fake_db_account.id,
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
         "certificate_period_start": "2024-01-01",
         "certificate_period_end": "2020-01-01",
     }
@@ -362,7 +362,7 @@ def test_query_certificate_bundles(
     # Test case 6: Query certificates with invalid certificate_period_start and certificate_period_end > 30 days
     test_data_6: dict[str, Any] = {
         "source_id": fake_db_account.id,
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
         "certificate_period_start": "2024-01-01",
         "certificate_period_end": "2024-05-01",
     }
@@ -383,7 +383,7 @@ def test_query_certificate_bundles(
     test_data_7: dict[str, Any] = {
         "issuance_ids": [create_issuance_id(fake_db_granular_certificate_bundle)],
         "source_id": fake_db_account.id,
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
         "certificate_period_start": "2024-01-01",
         "certificate_period_end": "2024-01-02",
     }
@@ -404,7 +404,7 @@ def test_query_certificate_bundles(
     # Test case 8: Query certificates with invalid certificate_period_start and certificate_period_end
     test_data_8: dict[str, Any] = {
         "source_id": fake_db_account.id,
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
         "certificate_period_start": "a date string",
         "certificate_period_end": "another date string",
     }
@@ -425,7 +425,7 @@ def test_query_certificate_bundles(
     # Test case 9: Try giving period start more than 30 days in the past with no end date
     test_data_9: dict[str, Any] = {
         "source_id": fake_db_account.id,
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
         "certificate_period_start": "2023-01-01",
     }
 
@@ -444,7 +444,7 @@ def test_query_certificate_bundles(
     # Test case 10: Try with period end, but no start date
     test_data_10: dict[str, Any] = {
         "source_id": fake_db_account.id,
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
         "certificate_period_end": "2023-01-01",
     }
 
@@ -463,7 +463,7 @@ def test_query_certificate_bundles(
     # Test case 11: Try to query certificates with invalid energy_source
     test_data_11: dict[str, Any] = {
         "source_id": fake_db_account.id,
-        "user_id": fake_db_user.id,
+        "user_id": fake_db_admin_user.id,
         "energy_source": "windy",
     }
 
@@ -488,7 +488,7 @@ def test_read_certificate_bundle(
     token: str,
     fake_db_granular_certificate_bundle: GranularCertificateBundle,
     fake_db_granular_certificate_bundle_2: GranularCertificateBundle,
-    fake_db_user: User,
+    fake_db_admin_user: User,
     fake_db_account: Account,
 ):
     response = api_client.get(
