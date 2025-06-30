@@ -33,4 +33,11 @@ def validate_readings(
     except Exception as e:
         return False, df, f"Error parsing datetime columns: {str(e)}"
 
+    df["interval_start_datetime"] = df["interval_start_datetime"].dt.strftime(
+        "%Y-%m-%dT%H:%M:%S.%fZ"
+    )
+    df["interval_end_datetime"] = df["interval_end_datetime"].dt.strftime(
+        "%Y-%m-%dT%H:%M:%S.%fZ"
+    )
+
     return True, df, ""
