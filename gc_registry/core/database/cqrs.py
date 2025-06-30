@@ -17,7 +17,7 @@ def write_to_database(
     write_session: Session,
     read_session: Session,
     esdb_client: EventStoreDBClient,
-) -> list[SQLModel] | None:
+) -> list[SQLModel]:
     """Write the provided entities to the read and write databases, saving an
     Event entry for each entity."""
 
@@ -38,7 +38,7 @@ def write_to_database(
             f"Error during commit to write DB during create: {str(e)}, session ID {id(write_session)}"
         )
         write_session.rollback()
-        return None
+        raise e
 
     try:
         # if needed, transform the entity into its equivalent read DB representation
@@ -53,7 +53,7 @@ def write_to_database(
         logger.error(f"Error during commit to read DB during create: {str(e)}")
         write_session.rollback()
         read_session.rollback()
-        return None
+        raise e
 
     if not entities[0].__class__.__name__ == "UserAccountLink":
         batch_create_events(

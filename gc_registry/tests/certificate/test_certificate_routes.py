@@ -1,8 +1,8 @@
 from typing import Any
 
+import pandas as pd
 from esdbclient import EventStoreDBClient
 from fastapi.testclient import TestClient
-import pandas as pd
 from sqlmodel import Session
 
 from gc_registry.account.models import Account, AccountWhitelistLink
@@ -597,7 +597,7 @@ def test_import_certificate_bundles(
     response = api_client.post(
         "/certificate/import",
         headers={"Authorization": f"Bearer {token}"},
-        data={"account_id": 50000},
+        data={"account_id": str(50000)},
         files={"file": ("test_import.csv", gc_df.to_csv(index=False))},
     )
 
@@ -612,7 +612,7 @@ def test_import_certificate_bundles(
     response = api_client.post(
         "/certificate/import",
         headers={"Authorization": f"Bearer {token}"},
-        data={"account_id": fake_db_account.id},
+        data={"account_id": str(fake_db_account.id)},
         files={"file": ("test_import.csv", gc_df_case_3.to_csv(index=False))},
     )
 
@@ -629,7 +629,7 @@ def test_import_certificate_bundles(
     response = api_client.post(
         "/certificate/import",
         headers={"Authorization": f"Bearer {token}"},
-        data={"account_id": fake_db_account.id},
+        data={"account_id": str(fake_db_account.id)},
         files={"file": ("test_import.csv", gc_df_case_4.to_csv(index=False))},
     )
 

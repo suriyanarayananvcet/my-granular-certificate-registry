@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, Hashable
+from typing import Any, Hashable, cast
 
 import pandas as pd
 from esdbclient import EventStoreDBClient
@@ -43,8 +43,13 @@ def create_generic_import_account(
         "account_name": "Import Account",
         "user_ids": [],
     }
-    account = Account.create(account_dict, write_session, read_session, esdb_client)[0]
-    return account
+    account_create = Account.create(
+        account_dict, write_session, read_session, esdb_client
+    )
+    if account_create is None:
+        raise ValueError("Could not create import account.")
+
+    return cast(Account, account_create[0])
 
 
 def create_generic_import_device(
@@ -77,8 +82,10 @@ def create_generic_import_device(
         "peak_demand": 0,
         "location": "N/A",
     }
-    device = Device.create(device_dict, write_session, read_session, esdb_client)[0]
-    return device
+    device_create = Device.create(device_dict, write_session, read_session, esdb_client)
+    if device_create is None:
+        raise ValueError("Could not create import device.")
+    return cast(Device, device_create[0])
 
 
 def seed_data():

@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, Callable, Hashable
+from typing import Any, Callable, Hashable, cast
 
 import pandas as pd
 import pytz
@@ -1104,6 +1104,8 @@ def import_gc_bundles_from_csv(
 
     # Assign the import device ID to the imported GCs
     import_device = Device.by_name("Import Device", read_session)
+    if not import_device:
+        raise ValueError("Import device not found.")
     gc_df["device_id"] = import_device.id
     gc_df["account_id"] = account_id
 
@@ -1126,10 +1128,11 @@ def import_gc_bundles_from_csv(
             esdb_client,
         )
 
-        if not metadata_records:
+        if metadata_records is None:
             raise ValueError(f"Could not create IssuanceMetaData for: {metadata_dict}")
 
-        metadata_id = metadata_records[0].id
+        metadata_record = cast(IssuanceMetaData, metadata_records[0])
+        metadata_id = metadata_record.id
 
         # Create a hashable key for the metadata combination, replacing NaN values with None
         metadata_key = tuple(
@@ -1194,7 +1197,11 @@ def import_gc_bundles_from_csv(
         esdb_client,
     )
 
-    if not gc_bundles:
+    if gc_bundles is None:
         raise ValueError("Could not create GC bundles.")
 
-    return gc_bundles
+    gc_bundles_cast = [
+        cast(GranularCertificateBundle, gc_bundle) for gc_bundle in gc_bundles
+    ]
+
+    return gc_bundles_cast

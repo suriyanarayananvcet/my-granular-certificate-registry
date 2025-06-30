@@ -54,7 +54,7 @@ class ActiveRecord(SQLModel):
         write_session: Session,
         read_session: Session,
         esdb_client: EventStoreDBClient,
-    ) -> list[SQLModel] | None:
+    ) -> list[SQLModel]:
         if isinstance(source, (SQLModel, BaseModel)):
             obj = [cls.model_validate(source)]
         elif isinstance(source, dict):

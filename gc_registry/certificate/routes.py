@@ -1,6 +1,5 @@
 import io
 from pathlib import Path
-import traceback
 
 import pandas as pd
 from esdbclient import EventStoreDBClient
@@ -8,7 +7,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlmodel import Session
 
-from gc_registry.account.models import Account
+from gc_registry.account.services import get_account_by_id
 from gc_registry.authentication.services import get_current_user
 from gc_registry.certificate.models import (
     GranularCertificateAction,
@@ -26,7 +25,6 @@ from gc_registry.certificate.schemas import (
     GranularCertificateQueryRead,
     GranularCertificateTransfer,
     IssuanceMetaDataBase,
-    IssuanceMetaDataRead,
 )
 from gc_registry.core.database import db, events
 from gc_registry.core.models.base import CertificateActionType, UserRoles
@@ -158,10 +156,9 @@ async def import_certificate_bundle(
     """
     validate_user_role(current_user, required_role=UserRoles.STORAGE_VALIDATOR)
 
-    account = Account.by_id(int(account_id), read_session)
+    account = get_account_by_id(int(account_id), read_session)
     if not account:
         raise ValueError(f"Account with ID {account_id} not found.")
-
     validate_user_access(current_user, account.id, read_session)
 
     try:
