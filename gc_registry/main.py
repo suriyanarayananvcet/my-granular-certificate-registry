@@ -17,7 +17,6 @@ from pyinstrument.renderers.html import HTMLRenderer
 from pyinstrument.renderers.speedscope import SpeedscopeRenderer
 from starlette.exceptions import HTTPException
 from starlette.middleware.sessions import SessionMiddleware
-from sqlalchemy import text
 
 from .account.routes import router as account_router
 from .authentication.routes import router as auth_router
@@ -188,9 +187,9 @@ app.add_middleware(SessionMiddleware, secret_key=settings.MIDDLEWARE_SECRET_KEY)
 
 
 # Register exception handlers
-app.add_exception_handler(RequestValidationError, validation_exception_handler)
-app.add_exception_handler(HTTPException, http_exception_handler)
-app.add_exception_handler(Exception, general_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)  # type: ignore
+app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore
+app.add_exception_handler(Exception, general_exception_handler)  # type: ignore
 
 
 # Assemble fastapi loggers

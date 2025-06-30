@@ -4,7 +4,6 @@ from typing import Any, Dict, Optional
 from fastapi import Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 logger = logging.getLogger(__name__)
@@ -34,7 +33,7 @@ class ErrorResponse:
         }
 
 
-def format_validation_error(error: ValidationError) -> ErrorResponse:
+def format_validation_error(error: RequestValidationError) -> ErrorResponse:
     """Format Pydantic validation errors into a user-friendly format."""
     details = {}
     for err in error.errors():
