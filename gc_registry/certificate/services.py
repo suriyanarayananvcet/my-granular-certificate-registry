@@ -28,6 +28,7 @@ from gc_registry.certificate.schemas import (
     GranularCertificateReserve,
     GranularCertificateTransfer,
     GranularCertificateWithdraw,
+    IssuanceMetaDataBase,
 )
 from gc_registry.certificate.validation import validate_granular_certificate_bundle
 from gc_registry.core.database import cqrs, db, events
@@ -1079,3 +1080,121 @@ def get_latest_issuance_metadata(db_session: Session) -> IssuanceMetaData | None
         return None
     else:
         return latest_issuance_metadata
+
+
+def import_gc_bundles_from_csv(
+    account_id: int,
+    gc_df: pd.DataFrame,
+    write_session: Session,
+    read_session: Session,
+    esdb_client: EventStoreDBClient,
+) -> list[GranularCertificateBundle]:
+    """Import GC bundles from a CSV file.
+
+    Args:
+        account_id (int): The account ID to assign to the imported GCs
+        gc_df (pd.DataFrame): DataFrame containing both IssuanceMetaData and GranularCertificateBundle attributes
+        write_session (Session): Database write session
+        read_session (Session): Database read session
+        esdb_client (EventStoreDBClient): EventStoreDB client
+
+    Returns:
+        list[GranularCertificateBundle]: List of created GC bundles
+    """
+
+    # Assign the import device ID to the imported GCs
+    import_device = Device.by_name("Import Device", read_session)
+    gc_df["device_id"] = import_device.id
+    gc_df["account_id"] = account_id
+
+    # Define the IssuanceMetaData fields
+    issuance_metadata_fields = list(IssuanceMetaDataBase.model_fields.keys())
+
+    # Create a mapping from unique IssuanceMetaData combinations to their IDs
+    metadata_mapping = {}
+
+    # Group by unique IssuanceMetaData combinations and create them
+    unique_metadata_groups = gc_df[issuance_metadata_fields].drop_duplicates()
+
+    for _, metadata_row in unique_metadata_groups.iterrows():
+        metadata_dict = metadata_row.to_dict()
+
+        metadata_records = IssuanceMetaData.create(
+            metadata_dict,
+            write_session,
+            read_session,
+            esdb_client,
+        )
+
+        if not metadata_records:
+            raise ValueError(f"Could not create IssuanceMetaData for: {metadata_dict}")
+
+        metadata_id = metadata_records[0].id
+
+        # Create a hashable key for the metadata combination, replacing NaN values with None
+        metadata_key = tuple(
+            sorted((k, v if not pd.isna(v) else None) for k, v in metadata_dict.items())
+        )
+        metadata_mapping[metadata_key] = metadata_id
+
+    # Now create the GC bundles with the correct metadata_id
+    gc_bundles_data = []
+
+    for _, row in gc_df.iterrows():
+        # Create the metadata key for this row
+        metadata_key = tuple(
+            sorted(
+                (k, v if not pd.isna(v) else None)
+                for k, v in row[issuance_metadata_fields].to_dict().items()
+            )
+        )
+        metadata_id = metadata_mapping[metadata_key]
+
+        # Create the GC bundle data dict, excluding metadata fields and adding metadata_id
+        bundle_data = row.drop(issuance_metadata_fields).to_dict()
+
+        bundle_data["metadata_id"] = metadata_id
+        bundle_data["hash"] = create_bundle_hash(bundle_data, None)
+        bundle_data["certificate_bundle_status"] = CertificateStatus.ACTIVE
+        bundle_data["production_starting_interval"] = pd.to_datetime(
+            bundle_data["production_starting_interval"], utc=True
+        ).strftime("%Y-%m-%d %H:%M:%S")
+        bundle_data["production_ending_interval"] = pd.to_datetime(
+            bundle_data["production_ending_interval"], utc=True
+        ).strftime("%Y-%m-%d %H:%M:%S")
+        bundle_data["expiry_datestamp"] = pd.to_datetime(
+            bundle_data["expiry_datestamp"], utc=True
+        ).strftime("%Y-%m-%d")
+
+        # Validate the bundle range start and end IDs
+        bundle_range_start = bundle_data["certificate_bundle_id_range_start"]
+        bundle_range_end = bundle_data["certificate_bundle_id_range_end"]
+        if bundle_range_start > bundle_range_end:
+            raise ValueError(
+                f"Bundle range start ID ({bundle_range_start}) is greater than the end ID ({bundle_range_end})"
+            )
+        if bundle_range_start < 0:
+            raise ValueError(
+                f"Bundle range start ID ({bundle_range_start}) is less than 0"
+            )
+        if bundle_range_end < 0:
+            raise ValueError(f"Bundle range end ID ({bundle_range_end}) is less than 0")
+        if bundle_range_end - bundle_range_start + 1 != bundle_data["bundle_quantity"]:
+            raise ValueError(
+                f"Bundle range end ID ({bundle_range_end}) - start ID ({bundle_range_start}) + 1 ({bundle_range_end - bundle_range_start + 1}) does not match the bundle quantity ({bundle_data['bundle_quantity']})"
+            )
+
+        gc_bundles_data.append(bundle_data)
+
+    # Create the GC bundles
+    gc_bundles = GranularCertificateBundle.create(
+        gc_bundles_data,
+        write_session,
+        read_session,
+        esdb_client,
+    )
+
+    if not gc_bundles:
+        raise ValueError("Could not create GC bundles.")
+
+    return gc_bundles

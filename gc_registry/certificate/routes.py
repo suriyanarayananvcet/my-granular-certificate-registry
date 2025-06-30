@@ -1,7 +1,14 @@
+import io
+from pathlib import Path
+import traceback
+
+import pandas as pd
 from esdbclient import EventStoreDBClient
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from sqlmodel import Session
 
+from gc_registry.account.models import Account
 from gc_registry.authentication.services import get_current_user
 from gc_registry.certificate.models import (
     GranularCertificateAction,
@@ -14,10 +21,12 @@ from gc_registry.certificate.schemas import (
     GranularCertificateBundleRead,
     GranularCertificateBundleReadFull,
     GranularCertificateCancel,
+    GranularCertificateImportResponse,
     GranularCertificateQuery,
     GranularCertificateQueryRead,
     GranularCertificateTransfer,
     IssuanceMetaDataBase,
+    IssuanceMetaDataRead,
 )
 from gc_registry.core.database import db, events
 from gc_registry.core.models.base import CertificateActionType, UserRoles
@@ -94,6 +103,85 @@ def create_issuance_metadata(
         db_issuance_metadata = db_issuance_metadata[0].model_dump()  # type: ignore
 
         return db_issuance_metadata
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/import_template", response_class=FileResponse)
+def get_import_template(current_user: User = Depends(get_current_user)):
+    """Return a template CSV file for importing GC bundles."""
+    template_path = (
+        Path(__file__).parent.parent / "static" / "templates" / "gc_import_template.csv"
+    )
+
+    if not template_path.exists():
+        raise HTTPException(status_code=404, detail="Template file not found.")
+
+    return FileResponse(
+        path=template_path,
+        filename="gc_import_template.csv",
+        media_type="text/csv",
+    )
+
+
+@router.post(
+    "/import",
+    response_model=GranularCertificateImportResponse,
+    status_code=201,
+)
+async def import_certificate_bundle(
+    account_id: int = Form(...),
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    write_session: Session = Depends(db.get_write_session),
+    read_session: Session = Depends(db.get_read_session),
+    esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
+) -> GranularCertificateImportResponse:
+    """Simplifed implementation of import functionality for GC bundles into GCOS.
+
+    This endpoint accepts a CSV file containing GC bundles and imports them into the database,
+    associating them with a generic import device and account as defined in `seed.py`.
+
+    It is assumed that the device that originally was issued the GC bundles is not present
+    on GCOS - TODO: how should we validate cases where for whatever reason, the device
+    is on GCOS? E.g. it exported the GCs, then imported them back?
+
+    To prevent double counting, we also assume that the GC bundles are issued according
+    to the EnergyTag Standard, and as such, will have a unique issuance ID associated
+    with the originating device and a consistent set of bundle range start and end IDs.
+
+    Args:
+        gc_import_csv (UploadFile): The CSV file containing the GCs to import.
+
+    Returns:
+        GranularCertificateImportResponse: Information on the imported GC bundles and issuance metadata.
+    """
+    validate_user_role(current_user, required_role=UserRoles.STORAGE_VALIDATOR)
+
+    account = Account.by_id(int(account_id), read_session)
+    if not account:
+        raise ValueError(f"Account with ID {account_id} not found.")
+
+    validate_user_access(current_user, account.id, read_session)
+
+    try:
+        # Read the uploaded file
+        contents = await file.read()
+        csv_file = io.StringIO(contents.decode("utf-8"))
+
+        # Convert to DataFrame
+        gc_df = pd.read_csv(csv_file)
+
+        gc_bundles = services.import_gc_bundles_from_csv(
+            account_id, gc_df, write_session, read_session, esdb_client
+        )
+
+        return GranularCertificateImportResponse(
+            message="Certificate bundles imported successfully.",
+            number_of_imported_certificate_bundles=len(gc_bundles),
+            total_imported_energy=sum(bundle.bundle_quantity for bundle in gc_bundles),
+        )
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

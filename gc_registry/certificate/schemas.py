@@ -192,6 +192,12 @@ class IssuanceMetaDataBase(BaseModel):
     )
 
 
+class IssuanceMetaDataRead(IssuanceMetaDataBase):
+    id: int = Field(
+        description="A unique ID assigned to this Issuance Metadata.",
+    )
+
+
 class GranularCertificateBundleRead(GranularCertificateBundleBase):
     id: int = Field(
         description="A unique ID assigned to this GC Bundle.",
@@ -695,3 +701,9 @@ class GranularCertificateActionRead(GranularCertificateActionBase):
         primary_key=True,
         description="A unique ID assigned to this action.",
     )
+
+
+class GranularCertificateImportResponse(BaseModel):
+    message: str
+    number_of_imported_certificate_bundles: int
+    total_imported_energy: int
