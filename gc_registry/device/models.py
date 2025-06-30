@@ -1,7 +1,7 @@
 import datetime
 from typing import TYPE_CHECKING
 
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, Relationship, Session, SQLModel, select
 
 from gc_registry.core.models.base import DeviceTechnologyType
 from gc_registry.device.schemas import DeviceBase
@@ -26,6 +26,10 @@ class Device(DeviceBase, table=True):
     )
     is_deleted: bool = Field(default=False)
     account: "Account" = Relationship(back_populates="devices")
+
+    @classmethod
+    def by_name(cls, name: str, read_session: Session) -> "Device | None":
+        return read_session.exec(select(cls).where(cls.device_name == name)).first()
 
 
 class DeviceRead(DeviceBase):
