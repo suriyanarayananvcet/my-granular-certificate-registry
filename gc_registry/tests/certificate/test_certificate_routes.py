@@ -2,11 +2,13 @@ from typing import Any
 
 from esdbclient import EventStoreDBClient
 from fastapi.testclient import TestClient
+import pandas as pd
 from sqlmodel import Session
 
 from gc_registry.account.models import Account, AccountWhitelistLink
 from gc_registry.certificate.models import GranularCertificateBundle
 from gc_registry.certificate.services import create_issuance_id
+from gc_registry.device.models import Device
 from gc_registry.user.models import User
 
 
@@ -569,3 +571,69 @@ def test_read_certificate_bundle(
         response.json()["issuance_id"]
         == fake_db_granular_certificate_bundle.issuance_id
     )
+
+
+def test_import_certificate_bundles(
+    api_client: TestClient,
+    token: str,
+    fake_db_account: Account,
+    generic_import_device: Device,
+):
+    # Use the template CSV
+    gc_df = pd.read_csv("gc_registry/tests/data/test_import.csv")
+
+    # Test case 1: Successful import
+    response = api_client.post(
+        "/certificate/import",
+        headers={"Authorization": f"Bearer {token}"},
+        data={"account_id": str(fake_db_account.id)},
+        files={"file": ("test_import.csv", gc_df.to_csv(index=False))},
+    )
+    print(response.json())
+    assert response.status_code == 201
+    assert response.json()["message"] == "Certificate bundles imported successfully."
+
+    # Test case 2: Import with invalid account ID
+    response = api_client.post(
+        "/certificate/import",
+        headers={"Authorization": f"Bearer {token}"},
+        data={"account_id": 50000},
+        files={"file": ("test_import.csv", gc_df.to_csv(index=False))},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["message"] == "Account with id 50000 not found"
+
+    # Test case 3: Import with invalid start and end range IDs
+    gc_df_case_3 = gc_df.copy()
+    gc_df_case_3["certificate_bundle_id_range_start"] = 50000
+    gc_df_case_3["certificate_bundle_id_range_end"] = 49999
+
+    response = api_client.post(
+        "/certificate/import",
+        headers={"Authorization": f"Bearer {token}"},
+        data={"account_id": fake_db_account.id},
+        files={"file": ("test_import.csv", gc_df_case_3.to_csv(index=False))},
+    )
+
+    assert response.status_code == 400
+    assert (
+        response.json()["message"]
+        == "Bundle range start ID (50000) is greater than the end ID (49999)"
+    )
+
+    # Test case 4: Import with invalid bundle quantity
+    gc_df_case_4 = gc_df.copy()
+    gc_df_case_4["bundle_quantity"] = 100
+
+    response = api_client.post(
+        "/certificate/import",
+        headers={"Authorization": f"Bearer {token}"},
+        data={"account_id": fake_db_account.id},
+        files={"file": ("test_import.csv", gc_df_case_4.to_csv(index=False))},
+    )
+
+    assert response.status_code == 400
+    expected_message = "Bundle range end ID (5209999) - start ID (0) + 1 (5210000) does not match the bundle quantity (100)"
+    actual_message = response.json()["message"]
+    assert actual_message == expected_message
