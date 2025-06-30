@@ -606,7 +606,6 @@ def fake_db_granular_certificate_bundle_2(
     return granular_certificate_bundle_write
 
 
-
 @pytest.fixture
 def valid_storage_record_csv():
     """Create a CSV string with valid storage record data."""
