@@ -75,7 +75,9 @@ def get_storage_allocation_template(current_user: User = Depends(get_current_use
     )
 
     if not template_path.exists():
-        raise HTTPException(status_code=404, detail="Template file not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Template file not found."
+        )
 
     return FileResponse(
         path=template_path,
@@ -112,7 +114,10 @@ async def submit_storage_records(
         df = pd.read_csv(csv_file)
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error reading CSV file: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error reading CSV file: {str(e)}",
+        )
 
     df["device_id"] = device_id
 
@@ -121,19 +126,21 @@ async def submit_storage_records(
 
     if not device:
         raise HTTPException(
-            status_code=404, detail=f"Device with ID {device_id} not found."
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Device with ID {device_id} not found.",
         )
 
     if not device.is_storage:
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Device with ID {device_id} is not a storage device.",
         )
 
     passed, message = validate_storage_records(df, read_session, device_id)
     if not passed:
         raise HTTPException(
-            status_code=400, detail=f"Invalid measurement data: {message}"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid measurement data: {message}",
         )
 
     validate_user_access(current_user, device.account_id, read_session)

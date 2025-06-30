@@ -94,6 +94,72 @@ def test_submit_storage_charge_records_success(
     response_data = response.json()
     assert response_data["message"] == "Storage records created successfully."
 
+    # now try submitting the CSV data with incorrect headers
+    invalid_csv_content = (
+        "device_id,flow_start,flow_end,flow_energy,validator_id\n"
+        f"{fake_db_storage_device.id},2024-01-01T00:00:00Z,2024-01-01T01:00:00Z,-1000,0\n"
+        f"{fake_db_storage_device.id},2024-01-01T01:00:00Z,2024-01-01T02:00:00Z,-1200,1\n"
+        f"{fake_db_storage_device.id},2024-01-01T01:00:00Z,2024-01-01T03:00:00Z,1000,2\n"
+        f"{fake_db_storage_device.id},2024-01-01T02:00:00Z,2024-01-01T04:00:00Z,-1500,3\n"
+        f"{fake_db_storage_device.id},2024-01-01T03:00:00Z,2024-01-01T05:00:00Z,600,4\n"
+    )
+
+    invalid_records_csv_file = io.BytesIO(invalid_csv_content.encode("utf-8"))
+
+    invalid_storage_files = {
+        "file": ("invalid_records.csv", invalid_records_csv_file, "text/csv")
+    }
+    response = api_client.post(
+        "/storage/storage_records",
+        files=invalid_storage_files,
+        data=data,
+        headers={"Authorization": f"Bearer {token_storage_validator}"},
+    )
+
+    print(response.text)
+
+    assert response.status_code == 400
+    response_data = response.json()
+    assert (
+        "Measurement DataFrame is missing required columns." in response_data["detail"]
+    )
+
+
+def test_submit_storage_records_invalid_timestamps(
+    api_client: TestClient,
+    token_storage_validator: str,
+    fake_db_storage_device: Device,
+    read_session: Session,
+):
+    """Test submission of storage records with invalid timestamps."""
+    # Create a CSV string with invalid timestamps
+    invalid_csv_content = (
+        "device_id,flow_start_datetime,flow_end_datetime,flow_energy,validator_id\n"
+        f"{fake_db_storage_device.id},invalid_date,2024-01-01T01:00:00Z,-1000,0\n"
+        f"{fake_db_storage_device.id},2024-01-01T01:00:00Z,invalid_date,-1200,1\n"
+    )
+
+    records_csv_file = io.BytesIO(invalid_csv_content.encode("utf-8"))
+
+    data = {
+        "device_id": str(fake_db_storage_device.id),
+    }
+
+    storage_files = {"file": ("invalid_records.csv", records_csv_file, "text/csv")}
+
+    response = api_client.post(
+        "/storage/storage_records",
+        files=storage_files,
+        data=data,
+        headers={"Authorization": f"Bearer {token_storage_validator}"},
+    )
+
+    print(response.text)
+
+    assert response.status_code == 400
+    response_data = response.json()
+    assert "Error parsing datetime columns:" in response_data["detail"]
+
 
 def test_get_allocated_storage_records_by_device_id(
     api_client: TestClient,
