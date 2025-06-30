@@ -10,29 +10,6 @@ from gc_registry.device.models import Device
 from gc_registry.storage.models import AllocatedStorageRecord
 
 
-@pytest.fixture
-def valid_storage_record_csv():
-    """Create a CSV string with valid storage record data."""
-    return (
-        "flow_start_datetime,flow_end_datetime,flow_energy,flow_energy_source,validator_id\n"
-        "2024-01-01T00:00:00Z,2024-01-01T01:00:00Z,-1000,GRID,0\n"
-        "2024-01-01T01:00:00Z,2024-01-01T02:00:00Z,-1200,GRID,1\n"
-        "2024-01-01T01:00:00Z,2024-01-01T02:00:00Z,1000,,2\n"
-        "2024-01-01T02:00:00Z,2024-01-01T03:00:00Z,-1500,SOLAR,3\n"
-        "2024-01-01T03:00:00Z,2024-01-01T04:00:00Z,600,,4\n"
-    )
-
-
-@pytest.fixture
-def valid_allocation_record_csv():
-    """Create a CSV string with valid allocation record data."""
-    return (
-        "scr_allocation_id,sdr_allocation_id,sdr_proportion,scr_allocation_methodology,gc_allocation_id,sdgc_allocation_id,efficiency_factor_methodology,efficiency_factor_interval_start,efficiency_factor_interval_end,storage_efficiency_factor\n"
-        "0,2,1.0,FIFO,,,EnergyTag Standard,2024-01-01 00:00:00,2025-01-01 00:00:00,0.87\n"
-        "1,4,0.5,FIFO,,,EnergyTag Standard,2024-01-01 00:00:00,2025-01-01 00:00:00,0.87\n"
-    )
-
-
 def test_submit_storage_records_success(
     api_client: TestClient,
     token_storage_validator: str,
@@ -82,15 +59,15 @@ def test_submit_storage_records_success(
 
     print(response.text)
 
-    # assert response.status_code == 201
-    # response_data = response.json()
-    # assert response_data["message"] == "Allocation records created successfully."
-    # assert response_data["total_records"] == 2
+    assert response.status_code == 201
+    response_data = response.json()
+    assert response_data["message"] == "Allocation records created successfully."
+    assert response_data["total_records"] == 2
 
 
 def test_submit_storage_charge_records_success(
     api_client: TestClient,
-    token: str,
+    token_storage_validator: str,
     valid_storage_record_csv: str,
     fake_db_storage_device: Device,
     read_session: Session,
@@ -108,18 +85,14 @@ def test_submit_storage_charge_records_success(
         "/storage/storage_records",
         files=storage_files,
         data=data,
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": f"Bearer {token_storage_validator}"},
     )
 
     print(response.text)
 
     assert response.status_code == 201
     response_data = response.json()
-    assert response_data["message"] == "Storage Charge Records submitted successfully."
-    assert response.status_code == 201
-    response_data = response.json()
-    assert response_data["message"] == "Allocation records created successfully."
-    assert response_data["total_records"] == 2
+    assert response_data["message"] == "Storage records created successfully."
 
 
 def test_get_allocated_storage_records_by_device_id(

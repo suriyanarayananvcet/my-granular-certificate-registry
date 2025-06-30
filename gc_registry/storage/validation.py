@@ -101,6 +101,9 @@ def validate_storage_records(
                 False,
                 "Measurement DataFrame does not follow the previous time series.",
             )
+        
+    measurement_df["flow_start_datetime"] = measurement_df["flow_start_datetime"].dt.strftime('%Y-%m-%dT%H:%M:%S%z')
+    measurement_df["flow_end_datetime"] = measurement_df["flow_end_datetime"].dt.strftime('%Y-%m-%dT%H:%M:%S%z')
 
     return True, None
 
