@@ -105,7 +105,7 @@ def create_issuance_metadata(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/import_template", response_class=FileResponse)
+@router.get("/certificate_import_template", response_class=FileResponse)
 def get_import_template(current_user: User = Depends(get_current_user)):
     """Return a template CSV file for importing GC bundles."""
     template_path = (
