@@ -1,12 +1,16 @@
-from typing import Any
+import logging
+from typing import Any, cast
+
 from esdbclient import EventStoreDBClient
 from sqlmodel import Session, select
 from sqlmodel.sql.expression import SelectOfScalar
 
+from gc_registry.account.models import Account
 from gc_registry.certificate.models import GranularCertificateBundle
-from gc_registry.core.models.base import EnergySourceType
-from gc_registry.device.models import Device
+from gc_registry.device.models import Device, DeviceCreate
 from gc_registry.settings import settings
+
+logger = logging.getLogger(__name__)
 
 
 def get_all_devices(db_session: Session) -> list[Device]:
@@ -94,7 +98,7 @@ def get_certificate_bundles_by_device_id(
 
 def create_import_device(
     device_dict: dict[str, Any],
-    db_session: Session,
+    write_session: Session,
     read_session: Session,
     esdb_client: EventStoreDBClient,
 ) -> Device:
@@ -107,15 +111,25 @@ def create_import_device(
 
     Args:
         device_dict (dict[str, Any]): The device dictionary.
-        db_session (Session): The database session.
+        write_session (Session): The database write session.
         read_session (Session): The read session.
         esdb_client (EventStoreDBClient): The event store DB client.
 
     Returns:
+        Device: The created device.
     """
-    device = Device.model_validate(device_dict)
-    db_session.add(device)
-    db_session.commit()
-    db_session.refresh(device)
+    logger.info(f"Creating import device: {device_dict}...")
+    if "account_id" in device_dict:
+        import_account_id = device_dict["account_id"]
+    else:
+        import_account_id = Account.by_name("Import Account", read_session).id
+        device_dict["account_id"] = import_account_id
 
+    device_create = DeviceCreate.model_validate(device_dict)
+    device = Device.create(device_create, write_session, read_session, esdb_client)
+    if device is None:
+        raise ValueError("Could not create import device.")
+
+    logger.info(f"Created import device with ID {device[0].id}...")
+    device = cast(Device, device[0])
     return device

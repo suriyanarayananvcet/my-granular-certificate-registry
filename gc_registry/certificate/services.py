@@ -1,4 +1,5 @@
 import datetime
+import json
 from typing import Any, Callable, Hashable, cast
 
 import pandas as pd
@@ -39,6 +40,7 @@ from gc_registry.core.models.base import CertificateActionType
 from gc_registry.core.services import create_bundle_hash
 from gc_registry.device.meter_data.abstract_meter_client import AbstractMeterDataClient
 from gc_registry.device.models import Device
+from gc_registry.device.schemas import DeviceBase
 from gc_registry.device.services import (
     get_all_devices,
     get_certificate_bundles_by_device_id,
@@ -1089,9 +1091,10 @@ def get_latest_issuance_metadata(db_session: Session) -> IssuanceMetaData | None
         return latest_issuance_metadata
 
 
-def import_gc_bundles_from_csv(
+def import_gc_bundles(
     account_id: int,
     gc_df: pd.DataFrame,
+    device_json: str,
     write_session: Session,
     read_session: Session,
     esdb_client: EventStoreDBClient,
@@ -1101,6 +1104,7 @@ def import_gc_bundles_from_csv(
     Args:
         account_id (int): The account ID to assign to the imported GCs
         gc_df (pd.DataFrame): DataFrame containing both IssuanceMetaData and GranularCertificateBundle attributes
+        device_json (DeviceBase): Device details of the issuing device
         write_session (Session): Database write session
         read_session (Session): Database read session
         esdb_client (EventStoreDBClient): EventStoreDB client
@@ -1108,39 +1112,17 @@ def import_gc_bundles_from_csv(
     Returns:
         list[GranularCertificateBundle]: List of created GC bundles
     """
+    if isinstance(device_json, str):
+        device_json = json.loads(device_json)
+    if device_json.get("device_name") is None:
+        raise ValueError("Device name is required to import certificates.")
 
-    # Check that only a single import device was provided
-    import_device_name = gc_df["device_name"].unique()
-    if len(import_device_name) != 1:
-        raise ValueError("Certificate imports must be from a single device at a time.")
+    import_device = Device.by_name(device_json.get("device_name"), read_session)
 
-    import_device_name = import_device_name[0]
-    import_device = Device.by_name(import_device_name, read_session)
+    # If the device is not present, all details must be provided
     if not import_device:
-
-        def get_unique_or_none(series: pd.Series) -> Any:
-            """Return the unique value from a pandas Series if there is exactly one, else None."""
-            unique_values = series.unique()
-            if len(unique_values) == 1:
-                return unique_values[0]
-            return None
-
-        device_dict = {
-            "device_name": import_device_name,
-            "local_device_identifier": get_unique_or_none(
-                gc_df["local_device_identifier"]
-            ),
-            "grid": get_unique_or_none(gc_df["grid"]),
-            "energy_source": get_unique_or_none(gc_df["energy_source"]),
-            "technology_type": get_unique_or_none(gc_df["technology_type"]),
-            "operational_date": get_unique_or_none(gc_df["operational_date"]),
-            "capacity": get_unique_or_none(gc_df["capacity"]),
-            "peak_demand": get_unique_or_none(gc_df["peak_demand"]),
-            "location": get_unique_or_none(gc_df["location"]),
-            "is_storage": get_unique_or_none(gc_df["is_storage"]),
-        }
         import_device = create_import_device(
-            device_dict, write_session, read_session, esdb_client
+            device_json, write_session, read_session, esdb_client
         )
 
     gc_df["device_id"] = import_device.id
@@ -1197,6 +1179,9 @@ def import_gc_bundles_from_csv(
 
         # Create the GC bundle data dict, excluding metadata fields and adding metadata_id
         bundle_data = row.drop(issuance_metadata_fields).to_dict()
+
+        # Replace nan values with None
+        bundle_data = {k: (None if pd.isna(v) else v) for k, v in bundle_data.items()}
 
         bundle_data["metadata_id"] = metadata_id
         bundle_data["hash"] = create_bundle_hash(bundle_data, None)

@@ -28,7 +28,8 @@ def create_generic_import_account(
 ) -> Account:
     """Create a generic import account for the GC import endpoint.
 
-    This account is associated with the generic import device and is used
+    This account is used to link metadata from devices not registered on
+    GCOS by representing them as devices inaccessible to users,
     solely to maintain foreign keys between imported GCs and the account
     table. Checks first to see if the account already exists, and if not,
     creates it. This account is not accessible to any users and cannot
@@ -50,42 +51,6 @@ def create_generic_import_account(
         raise ValueError("Could not create import account.")
 
     return cast(Account, account_create[0])
-
-
-def create_generic_import_device(
-    import_account_id: int,
-    write_session: Session,
-    read_session: Session,
-    esdb_client: EventStoreDBClient,
-) -> Device:
-    """Create a generic import device and account for the GC import endpoint.
-
-    This device is associated with an inaccessible account and is used
-    solely to maintain foreign keys between imported GCs and the device
-    table. In practice, device details necessary to translate the attributes
-    of the GC will be present in the imported GC metadata. Checks first to see
-    if the device already exists, and if not, creates it."""
-
-    device = Device.by_name("Import Device", read_session)
-    if device:
-        return device
-
-    device_dict = {
-        "account_id": import_account_id,
-        "device_name": "Import Device",
-        "local_device_identifier": "GENERIC_IMPORT_DEVICE",
-        "grid": "N/A",
-        "energy_source": EnergySourceType.other,
-        "technology_type": DeviceTechnologyType.other,
-        "operational_date": str(datetime.datetime(2015, 1, 1, 0, 0, 0)),
-        "capacity": 0,
-        "peak_demand": 0,
-        "location": "N/A",
-    }
-    device_create = Device.create(device_dict, write_session, read_session, esdb_client)
-    if device_create is None:
-        raise ValueError("Could not create import device.")
-    return cast(Device, device_create[0])
 
 
 def seed_data():
@@ -142,11 +107,8 @@ def seed_data():
     )[0]
 
     # Create a generic import account and device
-    import_account = create_generic_import_account(
+    _import_account = create_generic_import_account(
         write_session, read_session, esdb_client
-    )
-    _ = create_generic_import_device(
-        import_account.id, write_session, read_session, esdb_client
     )
 
     # Create an Account to add the certificates to
