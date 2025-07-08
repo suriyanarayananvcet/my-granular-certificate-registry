@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 import pandas as pd
@@ -574,10 +575,10 @@ def test_read_certificate_bundle(
 
 
 def test_import_certificate_bundles(
+    import_device_json: str,
     api_client: TestClient,
     token: str,
     fake_db_account: Account,
-    generic_import_device: Device,
 ):
     # Use the template CSV
     gc_df = pd.read_csv("gc_registry/tests/data/test_import.csv")
@@ -586,7 +587,10 @@ def test_import_certificate_bundles(
     response = api_client.post(
         "/certificate/import",
         headers={"Authorization": f"Bearer {token}"},
-        data={"account_id": str(fake_db_account.id)},
+        data={
+            "account_id": str(fake_db_account.id),
+            "device_json": json.dumps(import_device_json),
+        },
         files={"file": ("test_import.csv", gc_df.to_csv(index=False))},
     )
     print(response.json())
@@ -597,12 +601,12 @@ def test_import_certificate_bundles(
     response = api_client.post(
         "/certificate/import",
         headers={"Authorization": f"Bearer {token}"},
-        data={"account_id": str(50000)},
+        data={"account_id": str(50000), "device_json": json.dumps(import_device_json)},
         files={"file": ("test_import.csv", gc_df.to_csv(index=False))},
     )
 
     assert response.status_code == 404
-    assert response.json()["message"] == "Account with id 50000 not found"
+    assert response.json()["message"] == "Account with ID 50000 not found."
 
     # Test case 3: Import with invalid start and end range IDs
     gc_df_case_3 = gc_df.copy()
@@ -612,14 +616,17 @@ def test_import_certificate_bundles(
     response = api_client.post(
         "/certificate/import",
         headers={"Authorization": f"Bearer {token}"},
-        data={"account_id": str(fake_db_account.id)},
+        data={
+            "account_id": str(fake_db_account.id),
+            "device_json": json.dumps(import_device_json),
+        },
         files={"file": ("test_import.csv", gc_df_case_3.to_csv(index=False))},
     )
 
     assert response.status_code == 400
     assert (
         response.json()["message"]
-        == "Bundle range start ID (50000) is greater than the end ID (49999)"
+        == "bundle_quantity does not match criteria for equal"
     )
 
     # Test case 4: Import with invalid bundle quantity
@@ -629,11 +636,14 @@ def test_import_certificate_bundles(
     response = api_client.post(
         "/certificate/import",
         headers={"Authorization": f"Bearer {token}"},
-        data={"account_id": str(fake_db_account.id)},
+        data={
+            "account_id": str(fake_db_account.id),
+            "device_json": json.dumps(import_device_json),
+        },
         files={"file": ("test_import.csv", gc_df_case_4.to_csv(index=False))},
     )
 
     assert response.status_code == 400
-    expected_message = "Bundle range end ID (5209999) - start ID (0) + 1 (5210000) does not match the bundle quantity (100)"
+    expected_message = "bundle_quantity does not match criteria for equal"
     actual_message = response.json()["message"]
     assert actual_message == expected_message

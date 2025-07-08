@@ -1,3 +1,4 @@
+import json
 import os
 from typing import Any, Callable, Generator
 
@@ -321,34 +322,22 @@ def generic_import_account(write_session: Session, read_session: Session) -> Acc
 
 
 @pytest.fixture()
-def generic_import_device(
-    write_session: Session,
-    read_session: Session,
-    generic_import_account: Account,
-) -> Device:
-    """Create the generic import device."""
-    device_dict = {
+def import_device_json(generic_import_account: Account) -> str:
+    """Create a device JSON string."""
+    return {
         "account_id": generic_import_account.id,
         "device_name": "Import Device",
         "local_device_identifier": "GENERIC_IMPORT_DEVICE",
         "grid": "N/A",
-        "energy_source": EnergySourceType.other,
-        "technology_type": DeviceTechnologyType.other,
+        "energy_source": EnergySourceType.solar_pv,
+        "technology_type": DeviceTechnologyType.solar_pv,
         "operational_date": "2020-01-01",
-        "capacity": 0,
-        "peak_demand": 0,
-        "location": "N/A",
+        "capacity": 500,
+        "peak_demand": 10,
+        "location": "USA",
         "is_storage": False,
         "is_deleted": False,
     }
-
-    device_write = Device.model_validate(device_dict)
-
-    device_read = add_entity_to_write_and_read(
-        device_write, write_session, read_session
-    )
-
-    return device_read
 
 
 @pytest.fixture()
