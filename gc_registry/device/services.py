@@ -1,7 +1,10 @@
+from typing import Any
+from esdbclient import EventStoreDBClient
 from sqlmodel import Session, select
 from sqlmodel.sql.expression import SelectOfScalar
 
 from gc_registry.certificate.models import GranularCertificateBundle
+from gc_registry.core.models.base import EnergySourceType
 from gc_registry.device.models import Device
 from gc_registry.settings import settings
 
@@ -77,3 +80,42 @@ def map_device_to_certificate_read(device: Device) -> dict:
     ]
 
     return device_dict
+
+
+def get_certificate_bundles_by_device_id(
+    db_session: Session, device_id: int
+) -> list[GranularCertificateBundle]:
+    stmt: SelectOfScalar = select(GranularCertificateBundle).where(
+        GranularCertificateBundle.device_id == device_id
+    )
+    certificate_bundles = db_session.exec(stmt).all()
+    return list(certificate_bundles)
+
+
+def create_import_device(
+    device_dict: dict[str, Any],
+    db_session: Session,
+    read_session: Session,
+    esdb_client: EventStoreDBClient,
+) -> Device:
+    """Create an import device for a certificate import.
+
+    To maintain certificate validation services within the registry, each unique import device
+    is replicated within GCOS and assigned to an 'Import Account' that is not associated with any
+    user or organisation. The import device is used to track the import of certificates from another registry
+    and validate the certificates against the import device's characteristics and previous GC imports.
+
+    Args:
+        device_dict (dict[str, Any]): The device dictionary.
+        db_session (Session): The database session.
+        read_session (Session): The read session.
+        esdb_client (EventStoreDBClient): The event store DB client.
+
+    Returns:
+    """
+    device = Device.model_validate(device_dict)
+    db_session.add(device)
+    db_session.commit()
+    db_session.refresh(device)
+
+    return device
