@@ -73,7 +73,7 @@ def validate_storage_records(
     # Check for continuous time series
     measurement_df.sort_values(by="flow_start_datetime", inplace=True)
     unique_diff = measurement_df["flow_start_datetime"].diff().dropna().unique()
-    if len(unique_diff) != 1 and unique_diff[0] != pd.Timedelta(
+    if len(unique_diff) != 1 or unique_diff[0] != pd.Timedelta(
         hours=settings.CERTIFICATE_GRANULARITY_HOURS
     ):
         return (
