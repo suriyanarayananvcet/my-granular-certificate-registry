@@ -34,6 +34,7 @@ from gc_registry.device.services import map_device_to_certificate_read
 from gc_registry.logging_config import logger
 from gc_registry.user.models import User
 from gc_registry.user.validation import validate_user_access, validate_user_role
+from gc_registry.utils import parse_import_file
 
 from . import services
 
@@ -137,18 +138,23 @@ async def import_certificate_bundle(
 ) -> GranularCertificateImportResponse:
     """Simplifed implementation of import functionality for GC bundles into GCOS.
 
-    This endpoint accepts a CSV file containing GC bundles and imports them into the database,
+    This endpoint accepts a CSV or JSON file containing GC bundles and imports them into the database,
     associating them with a generic import device and account as defined in `seed.py`.
 
+    Supported file formats:
+    - CSV: Standard comma-separated values with headers
+    - JSON: Array of objects format, e.g., [{"column1": "value1", "column2": "value2"}, ...]
+
     It is assumed that the device that originally was issued the GC bundles is not present
-    on GCOS - TODO: how should we validate cases where for whatever reason, the device
-    is on GCOS? E.g. it exported the GCs, then imported them back?
+    on GCOS - an instance of the device will be created from the import file data provided
+    but linked to a generic import account that is inaccessible to users.
 
     To prevent double counting, we also assume that the GC bundles are issued according
     to the EnergyTag Standard, and as such, will have a unique issuance ID associated
     with the originating device and a consistent set of bundle range start and end IDs.
 
     Args:
+        account_id (int): The ID of the account to import the GCs to.
         gc_import_csv (UploadFile): The CSV file containing the GCs to import.
 
     Returns:
@@ -164,10 +170,10 @@ async def import_certificate_bundle(
     try:
         # Read the uploaded file
         contents = await file.read()
-        csv_file = io.StringIO(contents.decode("utf-8"))
+        content_str = contents.decode("utf-8")
 
-        # Convert to DataFrame
-        gc_df = pd.read_csv(csv_file)
+        # Parse the file into a pandas DataFrame
+        gc_df = parse_import_file(file.filename, content_str)
 
         gc_bundles = services.import_gc_bundles_from_csv(
             account_id, gc_df, write_session, read_session, esdb_client
