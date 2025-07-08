@@ -30,13 +30,20 @@ from gc_registry.certificate.schemas import (
     GranularCertificateWithdraw,
     IssuanceMetaDataBase,
 )
-from gc_registry.certificate.validation import validate_granular_certificate_bundle
+from gc_registry.certificate.validation import (
+    validate_granular_certificate_bundle,
+    validate_imported_granular_certificate_bundle,
+)
 from gc_registry.core.database import cqrs, db, events
 from gc_registry.core.models.base import CertificateActionType
 from gc_registry.core.services import create_bundle_hash
 from gc_registry.device.meter_data.abstract_meter_client import AbstractMeterDataClient
 from gc_registry.device.models import Device
-from gc_registry.device.services import get_all_devices
+from gc_registry.device.services import (
+    get_all_devices,
+    get_certificate_bundles_by_device_id,
+    create_import_device,
+)
 from gc_registry.logging_config import logger
 
 
@@ -1102,10 +1109,40 @@ def import_gc_bundles_from_csv(
         list[GranularCertificateBundle]: List of created GC bundles
     """
 
-    # Assign the import device ID to the imported GCs
-    import_device = Device.by_name("Import Device", read_session)
+    # Check that only a single import device was provided
+    import_device_name = gc_df["device_name"].unique()
+    if len(import_device_name) != 1:
+        raise ValueError("Certificate imports must be from a single device at a time.")
+
+    import_device_name = import_device_name[0]
+    import_device = Device.by_name(import_device_name, read_session)
     if not import_device:
-        raise ValueError("Import device not found.")
+
+        def get_unique_or_none(series: pd.Series) -> Any:
+            """Return the unique value from a pandas Series if there is exactly one, else None."""
+            unique_values = series.unique()
+            if len(unique_values) == 1:
+                return unique_values[0]
+            return None
+
+        device_dict = {
+            "device_name": import_device_name,
+            "local_device_identifier": get_unique_or_none(
+                gc_df["local_device_identifier"]
+            ),
+            "grid": get_unique_or_none(gc_df["grid"]),
+            "energy_source": get_unique_or_none(gc_df["energy_source"]),
+            "technology_type": get_unique_or_none(gc_df["technology_type"]),
+            "operational_date": get_unique_or_none(gc_df["operational_date"]),
+            "capacity": get_unique_or_none(gc_df["capacity"]),
+            "peak_demand": get_unique_or_none(gc_df["peak_demand"]),
+            "location": get_unique_or_none(gc_df["location"]),
+            "is_storage": get_unique_or_none(gc_df["is_storage"]),
+        }
+        import_device = create_import_device(
+            device_dict, write_session, read_session, esdb_client
+        )
+
     gc_df["device_id"] = import_device.id
     gc_df["account_id"] = account_id
 
@@ -1143,6 +1180,11 @@ def import_gc_bundles_from_csv(
     # Now create the GC bundles with the correct metadata_id
     gc_bundles_data = []
 
+    # Retrieve existing bundles for the import device once for validation
+    existing_bundles = get_certificate_bundles_by_device_id(
+        read_session, import_device.id
+    )
+
     for _, row in gc_df.iterrows():
         # Create the metadata key for this row
         metadata_key = tuple(
@@ -1170,22 +1212,9 @@ def import_gc_bundles_from_csv(
         ).strftime("%Y-%m-%d")
 
         # Validate the bundle range start and end IDs
-        bundle_range_start = bundle_data["certificate_bundle_id_range_start"]
-        bundle_range_end = bundle_data["certificate_bundle_id_range_end"]
-        if bundle_range_start > bundle_range_end:
-            raise ValueError(
-                f"Bundle range start ID ({bundle_range_start}) is greater than the end ID ({bundle_range_end})"
-            )
-        if bundle_range_start < 0:
-            raise ValueError(
-                f"Bundle range start ID ({bundle_range_start}) is less than 0"
-            )
-        if bundle_range_end < 0:
-            raise ValueError(f"Bundle range end ID ({bundle_range_end}) is less than 0")
-        if bundle_range_end - bundle_range_start + 1 != bundle_data["bundle_quantity"]:
-            raise ValueError(
-                f"Bundle range end ID ({bundle_range_end}) - start ID ({bundle_range_start}) + 1 ({bundle_range_end - bundle_range_start + 1}) does not match the bundle quantity ({bundle_data['bundle_quantity']})"
-            )
+        validate_imported_granular_certificate_bundle(
+            bundle_data, existing_bundles, import_device
+        )
 
         gc_bundles_data.append(bundle_data)
 

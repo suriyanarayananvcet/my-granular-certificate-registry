@@ -8,8 +8,10 @@ from gc_registry.certificate.models import (
 )
 from gc_registry.certificate.schemas import GranularCertificateBundleCreate
 from gc_registry.core.services import create_bundle_hash
+from gc_registry.device.models import Device
 from gc_registry.device.services import (
     device_mw_capacity_to_wh_max,
+    get_certificate_bundles_by_device_id,
     get_device_capacity_by_id,
 )
 from gc_registry.settings import settings
@@ -86,3 +88,73 @@ def validate_granular_certificate_bundle(
     return GranularCertificateBundle.model_validate(
         granular_certificate_bundle.model_dump()
     )
+
+
+def validate_imported_granular_certificate_bundle(
+    raw_granular_certificate_bundle: dict[str, Any],
+    existing_bundles: list[GranularCertificateBundle],
+    import_device: Device,
+    hours: float = settings.CERTIFICATE_GRANULARITY_HOURS,
+):
+    """Validate a granular certificate bundle imported from another registry.
+
+    The validation process is different from the internal issuance process in that
+    we cannot assume continuity of the range IDs as the original issuance will have
+    taken place in a different registry.
+
+    The validation process is therefore:
+    - Assert that the import device capacity is consistent with the bundle data
+    - Validation on the bundle range IDs in isolation
+    - Check that the imported bundle does not overlap with existing bundles for that import
+    device
+
+    Args:
+        raw_granular_certificate_bundle (dict[str, Any]): The raw bundle data
+        existing_bundles (list[GranularCertificateBundle]): The existing bundles for the import device
+        import_device (Device): The import device
+        hours (float): The hours in the certificate granularity
+    """
+
+    granular_certificate_bundle = GranularCertificateBundleCreate.model_validate(
+        raw_granular_certificate_bundle
+    )
+
+    device_max_watts_hours = device_mw_capacity_to_wh_max(import_device.capacity, hours)
+
+    # Validate the bundle quantity is equal to the difference between the bundle ID range
+    # and less than the device max watts hours
+    validate(
+        granular_certificate_bundle.bundle_quantity, identifier="bundle_quantity"
+    ).less_than(device_max_watts_hours * settings.CAPACITY_MARGIN).equal(
+        granular_certificate_bundle.certificate_bundle_id_range_end
+        - granular_certificate_bundle.certificate_bundle_id_range_start
+        + 1
+    )
+
+    # Check that the imported bundle does not overlap with existing bundles for that import device
+    for existing_bundle in existing_bundles:
+        new_start = granular_certificate_bundle.certificate_bundle_id_range_start
+        new_end = granular_certificate_bundle.certificate_bundle_id_range_end
+        existing_start = existing_bundle.certificate_bundle_id_range_start
+        existing_end = existing_bundle.certificate_bundle_id_range_end
+
+        overlap_detected = (
+            # New start overlaps with existing range (new_start between existing_start and existing_end)
+            (new_start >= existing_start and new_start <= existing_end)
+            or
+            # New end overlaps with existing range (new_end between existing_start and existing_end)
+            (new_end >= existing_start and new_end <= existing_end)
+            or
+            # New range completely contains existing range
+            (new_start <= existing_start and new_end >= existing_end)
+            or
+            # Existing range completely contains new range
+            (existing_start <= new_start and existing_end >= new_end)
+        )
+
+        if overlap_detected:
+            raise ValueError(
+                f"""Imported bundle range [{new_start}, {new_end}] for issuance ID \
+                    {granular_certificate_bundle.issuance_id} overlaps with existing bundle \
+                    {existing_bundle.id} range [{existing_start}, {existing_end}]"""
+            )
