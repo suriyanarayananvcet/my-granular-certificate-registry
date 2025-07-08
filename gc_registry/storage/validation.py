@@ -17,7 +17,7 @@ def get_latest_storage_record_by_device_id(
     query: SelectOfScalar = (
         select(StorageRecord)
         .where(
-            AllocatedStorageRecord.device_id == device_id,
+            StorageRecord.device_id == device_id,
         )
         .order_by(desc(StorageRecord.flow_start_datetime))
         .limit(1)
