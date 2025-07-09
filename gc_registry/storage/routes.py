@@ -249,7 +249,7 @@ def issue_SDGCs(
         validate_user_access(current_user, device.account_id, read_session)
 
         issued_sdgcs = issue_sdgcs_against_allocated_records(
-            allocated_storage_record_ids=allocated_storage_record_ids,
+            allocated_storage_records=allocated_storage_records,
             device=device,
             account_id=device.account_id,
             write_session=write_session,

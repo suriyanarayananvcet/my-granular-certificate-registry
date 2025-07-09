@@ -283,7 +283,7 @@ def get_max_certificate_id_by_device_id(
 
 
 def issue_sdgcs_against_allocated_records(
-    allocated_storage_record_ids: list[int],
+    allocated_storage_records: list[AllocatedStorageRecord],
     device: Device,
     account_id: int,
     write_session: Session = Depends(db.get_write_session),
@@ -292,12 +292,7 @@ def issue_sdgcs_against_allocated_records(
 ) -> list[SQLModel]:
     """Issue SDGCs against the specified allocated storage records."""
 
-    # Retrieve the allocated storage records
-    allocated_storage_records = read_session.exec(
-        select(AllocatedStorageRecord).where(
-            AllocatedStorageRecord.id.in_(allocated_storage_record_ids)  # type: ignore[union-attr]
-        )
-    ).all()
+    allocated_storage_record_ids = [record.id for record in allocated_storage_records]
 
     # Assert that all of the record IDs provided are valid
     if len(allocated_storage_records) != len(allocated_storage_record_ids):
@@ -306,6 +301,12 @@ def issue_sdgcs_against_allocated_records(
         }
         raise ValueError(
             f"One or more specified allocated storage record IDs do not exist: {missing_record_ids}"
+        )
+
+    # Check that all the allocated storage records have associated GC Bundles
+    if not all(record.gc_allocation_id for record in allocated_storage_records):
+        raise ValueError(
+            "All allocated storage records must have an associated GC Bundle ID."
         )
 
     # Retrieve the GC Bundles that have been cancelled and are associated with the allocated storage records
@@ -318,15 +319,6 @@ def issue_sdgcs_against_allocated_records(
             == CertificateStatus.CANCELLED,
         )
     ).all()
-
-    # Assert that the number of retrieved GC Bundles is equal to the number of allocated storage records
-    if len(cancelled_gc_bundles) != len(allocated_storage_records):
-        missing_gc_bundle_ids = {
-            record.gc_allocation_id for record in allocated_storage_records
-        } - {bundle.id for bundle in cancelled_gc_bundles}
-        raise ValueError(
-            f"One or more specified GC bundle IDs do not exist or have not been cancelled: {missing_gc_bundle_ids}"
-        )
 
     # Retrieve the associated SCRs/SDRs for the allocated storage records
     scr_ids = [record.scr_allocation_id for record in allocated_storage_records]

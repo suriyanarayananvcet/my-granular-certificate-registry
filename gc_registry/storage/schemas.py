@@ -85,6 +85,10 @@ class AllocatedStorageRecordCreate(AllocatedStorageRecordBase):
     pass
 
 
+class AllocatedStorageRecordUpdate(BaseModel):
+    gc_allocation_id: int | None
+
+
 class StorageActionBase(utils.ActiveRecord):
     """
     A record of a User's request to the registry to perform an action on an SCR/SDR.

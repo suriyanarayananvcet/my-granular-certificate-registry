@@ -41,6 +41,7 @@ from gc_registry.device.meter_data.abstract_meter_client import AbstractMeterDat
 from gc_registry.device.models import Device
 from gc_registry.device.services import get_all_devices, get_device_by_local_identifier
 from gc_registry.logging_config import logger
+from gc_registry.storage.schemas import AllocatedStorageRecordUpdate
 from gc_registry.storage.services import (
     get_allocated_storage_records_for_storage_record_id,
     get_storage_record_by_device_id_and_interval,
@@ -943,7 +944,7 @@ def cancel_certificates_for_storage(
     )
 
     # Cancel certificates and issue SDGCs against allocated storage records where applicable
-    allocated_storage_record_ids: list[int] = []
+    allocated_storage_records: list[SQLModel] = []
 
     for certificate in certificates_bundles_to_cancel:
         beneficiary = (
@@ -976,22 +977,28 @@ def cancel_certificates_for_storage(
         )
         if not allocated_storage_record:
             continue
-        allocated_storage_record_ids.extend(
-            [
-                allocated_storage_record.id
-                for allocated_storage_record in allocated_storage_record
-                if allocated_storage_record.id is not None
-            ]
-        )
 
-    issued_sdgcs = issue_sdgcs_against_allocated_records(
-        allocated_storage_record_ids=allocated_storage_record_ids,
-        device=storage_device,
-        account_id=storage_device.account_id,
-        write_session=write_session,
-        read_session=read_session,
-        esdb_client=esdb_client,
-    )
+        # Update storage record with the cancelled certificate
+        for asr in allocated_storage_record:
+            asr_update = AllocatedStorageRecordUpdate(gc_allocation_id=certificate.id)
+            updated_asr = asr.update(
+                asr_update,
+                write_session,
+                read_session,
+                esdb_client,
+            )
+            if updated_asr:
+                allocated_storage_records.append(updated_asr)
+
+    if allocated_storage_records:
+        issued_sdgcs = issue_sdgcs_against_allocated_records(
+            allocated_storage_records=allocated_storage_records,  # type: ignore
+            device=storage_device,
+            account_id=storage_device.account_id,
+            write_session=write_session,
+            read_session=read_session,
+            esdb_client=esdb_client,
+        )
 
     return ActionResult(
         action_type=CertificateActionType.CANCEL_FOR_STORAGE,
