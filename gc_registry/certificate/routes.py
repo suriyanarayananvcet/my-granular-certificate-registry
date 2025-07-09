@@ -245,7 +245,7 @@ def certificate_bundle_cancellation(
     response_model=GranularCertificateActionRead,
     status_code=202,
 )
-def certificate_bundle_cancellationfor_storage(
+def certificate_bundle_cancellation_for_storage(
     certificate_cancel: GranularCertificateCancelStorage,
     current_user: User = Depends(get_current_user),
     write_session: Session = Depends(db.get_write_session),
