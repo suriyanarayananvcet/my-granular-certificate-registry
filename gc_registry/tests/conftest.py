@@ -606,6 +606,29 @@ def fake_db_granular_certificate_bundle_2(
     return granular_certificate_bundle_write
 
 
+@pytest.fixture
+def valid_storage_record_csv():
+    """Create a CSV string with valid storage record data."""
+    return (
+        "flow_start_datetime,flow_end_datetime,flow_energy,validator_id\n"
+        "2024-01-01T00:00:00Z,2024-01-01T02:00:00Z,-1000,0\n"
+        "2024-01-01T01:00:00Z,2024-01-01T03:00:00Z,-1200,1\n"
+        "2024-01-01T02:00:00Z,2024-01-01T04:00:00Z,1000,2\n"
+        "2024-01-01T03:00:00Z,2024-01-01T05:00:00Z,-1500,3\n"
+        "2024-01-01T04:00:00Z,2024-01-01T06:00:00Z,600,4\n"
+    )
+
+
+@pytest.fixture
+def valid_allocation_record_csv():
+    """Create a CSV string with valid allocation record data."""
+    return (
+        "scr_allocation_id,sdr_allocation_id,sdr_proportion,scr_allocation_methodology,gc_allocation_id,sdgc_allocation_id,efficiency_factor_methodology,efficiency_factor_interval_start,efficiency_factor_interval_end,storage_efficiency_factor\n"
+        "0,2,1.0,FIFO,,,EnergyTag Standard,2024-01-01 00:00:00,2025-01-01 00:00:00,0.87\n"
+        "1,4,0.5,FIFO,,,EnergyTag Standard,2024-01-01 00:00:00,2025-01-01 00:00:00,0.87\n"
+    )
+
+
 @pytest.fixture()
 def fake_db_storage_records(
     write_session: Session,

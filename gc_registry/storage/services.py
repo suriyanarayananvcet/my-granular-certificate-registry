@@ -64,11 +64,9 @@ def create_charge_records_from_metering_data(
 ) -> dict:
     """Create a Storage Charge Record from the specified metering data."""
 
-    # Convert the storage records dataframe to the data model format
-    storage_records_df["is_charging"] = storage_records_df["flow_energy"].apply(
-        lambda x: False if x > 0 else True
-    )
+    storage_records_df["is_charging"] = storage_records_df["flow_energy"] < 0
     storage_records_df["flow_energy"] = storage_records_df["flow_energy"].abs()
+
     # Create the storage records
     _ = StorageRecord.create(
         storage_records_df.to_dict(orient="records"),
@@ -89,7 +87,6 @@ def create_charge_records_from_metering_data(
     total_energy = storage_records_df["flow_energy"].sum()
     total_records = len(storage_records_df)
 
-    # Create and return the response object properly
     return {
         "total_charge_energy": total_charge_energy,
         "total_discharge_energy": total_discharge_energy,

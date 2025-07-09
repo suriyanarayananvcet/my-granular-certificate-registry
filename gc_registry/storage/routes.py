@@ -11,22 +11,18 @@ from sqlmodel import Session, select
 from gc_registry.account.services import get_accounts_by_user_id
 from gc_registry.authentication.services import get_current_user
 from gc_registry.certificate.models import GranularCertificateBundle
-from gc_registry.certificate.schemas import GranularCertificateBundleCreate
 from gc_registry.core.database import db, events
 from gc_registry.core.models.base import UserRoles
 from gc_registry.device.models import Device
-from gc_registry.device.services import get_devices_by_account_id
+from gc_registry.device.services import get_device_by_id, get_devices_by_account_id
 from gc_registry.logging_config import logger
 from gc_registry.storage.models import (
     AllocatedStorageRecord,
     StorageAction,
-    StorageRecord,
 )
 from gc_registry.storage.schemas import (
     AllocatedStorageRecordSubmissionResponse,
     StorageActionResponse,
-    StorageRecordBase,
-    StorageRecordQueryResponse,
     StorageRecordSubmissionResponse,
 )
 from gc_registry.storage.services import (
@@ -36,6 +32,7 @@ from gc_registry.storage.services import (
     get_device_ids_in_allocated_storage_records,
     issue_sdgcs_against_allocated_records,
 )
+from gc_registry.storage.validation import validate_storage_records
 from gc_registry.user.models import User
 from gc_registry.user.validation import (
     validate_user_access,
@@ -78,7 +75,9 @@ def get_storage_allocation_template(current_user: User = Depends(get_current_use
     )
 
     if not template_path.exists():
-        raise HTTPException(status_code=404, detail="Template file not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Template file not found."
+        )
 
     return FileResponse(
         path=template_path,
@@ -88,13 +87,13 @@ def get_storage_allocation_template(current_user: User = Depends(get_current_use
 
 
 @router.post(
-    "/submit_storage_records",
+    "/storage_records",
     response_model=StorageRecordSubmissionResponse,
     status_code=201,
 )
 async def submit_storage_records(
     file: UploadFile = File(...),
-    deviceID: int = Form(...),
+    device_id: int = Form(...),
     current_user: User = Depends(get_current_user),
     write_session: Session = Depends(db.get_write_session),
     read_session: Session = Depends(db.get_read_session),
@@ -112,42 +111,59 @@ async def submit_storage_records(
         csv_file = io.StringIO(contents.decode("utf-8"))
 
         # Convert to DataFrame
-        storage_records_df = pd.read_csv(csv_file)
-        storage_records_df["device_id"] = deviceID
+        df = pd.read_csv(csv_file)
 
-        # Check that the device ID is associated with an account that the user has access to
-        device = Device.by_id(deviceID, read_session)
-
-        logger.info(f"Device: {device}")
-
-        if not device:
-            raise HTTPException(
-                status_code=404, detail=f"Device with ID {deviceID} not found."
-            )
-
-        validate_user_access(current_user, device.account_id, read_session)
-
-        # Create the storage records
-        storage_submission_response = create_charge_records_from_metering_data(
-            storage_records_df,
-            write_session,
-            read_session,
-            esdb_client,
-        )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error reading CSV file: {str(e)}",
+        )
 
-    return StorageRecordSubmissionResponse(**storage_submission_response)
+    df["device_id"] = device_id
+
+    device = get_device_by_id(read_session, device_id)
+    logger.info(f"Device: {device}")
+
+    if not device:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Device with ID {device_id} not found.",
+        )
+
+    if not device.is_storage:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Device with ID {device_id} is not a storage device.",
+        )
+
+    passed, message = validate_storage_records(df, read_session, device_id)
+    if not passed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid measurement data: {message}",
+        )
+
+    validate_user_access(current_user, device.account_id, read_session)
+
+    # Create the storage records
+    storage_submission_response = create_charge_records_from_metering_data(
+        df,
+        write_session,
+        read_session,
+        esdb_client,
+    )
+
+    return StorageRecordSubmissionResponse.model_validate(storage_submission_response)
 
 
 @router.post(
-    "/submit_allocation_records",
+    "/allocated_storage_records",
     response_model=AllocatedStorageRecordSubmissionResponse,
     status_code=201,
 )
 async def create_storage_allocation(
     file: UploadFile = File(...),
-    deviceID: int = Form(...),
+    device_id: int = Form(...),
     current_user: User = Depends(get_current_user),
     write_session: Session = Depends(db.get_write_session),
     read_session: Session = Depends(db.get_read_session),
@@ -167,16 +183,21 @@ async def create_storage_allocation(
 
         # Convert to DataFrame and replace NaN values with None
         allocated_storage_records_df = pd.read_csv(csv_file, keep_default_na=False)
-        allocated_storage_records_df["device_id"] = deviceID
+        allocated_storage_records_df["device_id"] = device_id
 
         # Check that the device ID is associated with an account that the user has access to
-        device = Device.by_id(deviceID, read_session)
+        device = Device.by_id(device_id, read_session)
 
         logger.info(f"Device: {device}")
 
         if not device:
             raise HTTPException(
-                status_code=404, detail=f"Device with ID {deviceID} not found."
+                status_code=404, detail=f"Device with ID {device_id} not found."
+            )
+        if not device.is_storage:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Device with ID {device_id} is not a storage device.",
             )
 
         validate_user_access(current_user, device.account_id, read_session)
@@ -220,7 +241,6 @@ def issue_SDGCs(
     """A GC Bundle that has been issued following the verification of a cancelled GC Bundle and the proper allocation of a pair
     of Storage Charge and Discharge Records. The GC Bundle is issued to the Account of the Storage Device, and is identical to
     a GC Bundle issued to a production Device albeit with additional storage-specific attributes as described in the Standard.
-
     These bundles can be queried using the same GC Bundle query endpoint as regular GC Bundles, but with the additional option to filter
     by the storage_id and the discharging_start_datetime, which is inherited from the allocated SDR.
     """
@@ -263,49 +283,6 @@ def issue_SDGCs(
 
 
 @router.post(
-    "/create_storage_record",
-    response_model=StorageRecord,
-    status_code=201,
-)
-def create_storage_record(
-    storage_record_base: StorageRecordBase,
-    current_user: User = Depends(get_current_user),
-    write_session: Session = Depends(db.get_write_session),
-    read_session: Session = Depends(db.get_read_session),
-    esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
-):
-    """Create a Storage Charge/Discharge Record with the specified properties."""
-    validate_user_role(current_user, required_role=UserRoles.PRODUCTION_USER)
-    validate_user_access(current_user, storage_record_base.device_id, read_session)
-
-    storage_record = StorageRecord.create(
-        storage_record_base, write_session, read_session, esdb_client
-    )
-
-    return storage_record
-
-
-@router.get(
-    "/query_storage_record",
-    response_model=StorageRecordQueryResponse,
-    status_code=200,
-)
-def query_SCR(
-    scr_query: StorageAction,
-    current_user: User = Depends(get_current_user),
-    write_session: Session = Depends(db.get_write_session),
-    read_session: Session = Depends(db.get_read_session),
-    esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
-):
-    """Return all storage records from the specified Account that match the provided search criteria."""
-    scr_action = StorageAction.create(
-        scr_query, write_session, read_session, esdb_client
-    )
-
-    return scr_action
-
-
-@router.post(
     "/withdraw_scr",
     response_model=StorageActionResponse,
     status_code=200,
@@ -343,33 +320,6 @@ def SDR_withdraw(
     )
 
     return sdr_action
-
-
-@router.post(
-    "/issue_sdgc",
-    response_model=GranularCertificateBundle,
-    status_code=200,
-)
-def issue_SDGC(
-    sdgc_create: GranularCertificateBundleCreate,
-    current_user: User = Depends(get_current_user),
-    write_session: Session = Depends(db.get_write_session),
-    read_session: Session = Depends(db.get_read_session),
-    esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
-):
-    """A GC Bundle that has been issued following the verification of a cancelled GC Bundle and the proper allocation of a pair
-    of Storage Charge and Discharge Records. The GC Bundle is issued to the Account of the Storage Device, and is identical to
-    a GC Bundle issued to a production Device albeit with additional storage-specific attributes as described in the Standard.
-
-    These bundles can be queried using the same GC Bundle query endpoint as regular GC Bundles, but with the additional option to filter
-    by the storage_id and the discharging_start_datetime, which is inherited from the allocated SDR.
-    """
-
-    sdgc = GranularCertificateBundle.create(
-        sdgc_create, write_session, read_session, esdb_client
-    )
-
-    return sdgc
 
 
 @router.get(
