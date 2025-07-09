@@ -40,11 +40,10 @@ from gc_registry.core.models.base import CertificateActionType
 from gc_registry.core.services import create_bundle_hash
 from gc_registry.device.meter_data.abstract_meter_client import AbstractMeterDataClient
 from gc_registry.device.models import Device
-from gc_registry.device.schemas import DeviceBase
 from gc_registry.device.services import (
+    create_import_device,
     get_all_devices,
     get_certificate_bundles_by_device_id,
-    create_import_device,
 )
 from gc_registry.logging_config import logger
 

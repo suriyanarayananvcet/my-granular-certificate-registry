@@ -1,9 +1,7 @@
-import io
 from pathlib import Path
 
-import pandas as pd
 from esdbclient import EventStoreDBClient
-from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlmodel import Session
 
@@ -30,7 +28,6 @@ from gc_registry.core.database import db, events
 from gc_registry.core.models.base import CertificateActionType, UserRoles
 from gc_registry.core.services import create_bundle_hash
 from gc_registry.device.models import Device
-from gc_registry.device.schemas import DeviceBase
 from gc_registry.device.services import map_device_to_certificate_read
 from gc_registry.logging_config import logger
 from gc_registry.user.models import User

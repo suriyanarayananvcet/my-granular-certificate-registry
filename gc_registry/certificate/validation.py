@@ -11,7 +11,6 @@ from gc_registry.core.services import create_bundle_hash
 from gc_registry.device.models import Device
 from gc_registry.device.services import (
     device_mw_capacity_to_wh_max,
-    get_certificate_bundles_by_device_id,
     get_device_capacity_by_id,
 )
 from gc_registry.settings import settings

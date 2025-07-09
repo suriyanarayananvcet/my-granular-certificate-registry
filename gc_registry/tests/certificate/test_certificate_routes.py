@@ -9,7 +9,6 @@ from sqlmodel import Session
 from gc_registry.account.models import Account, AccountWhitelistLink
 from gc_registry.certificate.models import GranularCertificateBundle
 from gc_registry.certificate.services import create_issuance_id
-from gc_registry.device.models import Device
 from gc_registry.user.models import User
 
 
