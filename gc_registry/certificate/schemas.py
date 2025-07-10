@@ -1,4 +1,5 @@
 import datetime
+from enum import Enum
 from functools import partial
 
 from fastapi import HTTPException
@@ -86,7 +87,7 @@ class GranularCertificateBundleBase(BaseModel):
     beneficiary: str | None = Field(
         default=None,
         description="""The Beneficiary entity that may make a claim on the attributes of the cancelled GC Bundles.
-                        If not specified, the Account holder is treated as the Beneficiary.""",
+                        If not specified, the Account holder is treated as the Beneficiary. This will default to the storage device in cases where cancelled for storage.""",
     )
 
     ### Bundle Characteristics ###
@@ -590,6 +591,12 @@ class GranularCertificateCancel(GranularCertificateActionBase):
         return values
 
 
+class GranularCertificateCancelStorage(GranularCertificateCancel):
+    storage_local_device_identifier: str = Field(
+        description="The identifier of the Storage Device that is to be used to store the energy represented by the cancelled GC Bundles. If not specified, the energy is not stored.",
+    )
+
+
 class GranularCertificateReserve(GranularCertificateActionBase):
     action_type: CertificateActionType = Field(
         default=CertificateActionType.RESERVE,
@@ -696,14 +703,36 @@ class GranularCertificateLock(GranularCertificateActionBase):
         return values
 
 
+class ActionOutcome(str, Enum):
+    SUCCESS = "Success"
+    FAILURE = "Failure"
+
+
+class ActionResult(BaseModel):
+    action_type: CertificateActionType = Field(
+        description="The type of action that was performed."
+    )
+    action_result: ActionOutcome = Field(
+        description="The result of the action that was performed."
+    )
+    details: str | None = Field(
+        default=None,
+        description="Additional details about the action result, if applicable.",
+    )
+
+
 class GranularCertificateActionRead(GranularCertificateActionBase):
     id: int | None = Field(
         primary_key=True,
         description="A unique ID assigned to this action.",
     )
 
-
+      
 class GranularCertificateImportResponse(BaseModel):
     message: str
     number_of_imported_certificate_bundles: int
     total_imported_energy: int
+    action_result: ActionResult | None = Field(
+        default=None,
+        description="The result of the action that was performed, including the action type, outcome, and any details.",
+    )

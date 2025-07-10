@@ -4,11 +4,10 @@ from typing import Any, Hashable
 import pandas as pd
 from esdbclient import EventStoreDBClient
 from fastapi import Depends
-from sqlmodel import Session, SQLModel, select
+from sqlmodel import Session, SQLModel, func, select
 from sqlmodel.sql.expression import SelectOfScalar
 
 from gc_registry.certificate.models import GranularCertificateBundle
-from gc_registry.certificate.services import get_max_certificate_id_by_device_id
 from gc_registry.core.database import db, events
 from gc_registry.core.models.base import (
     CertificateStatus,
@@ -34,6 +33,48 @@ def get_device_ids_in_allocated_storage_records(read_session: Session) -> list[i
     ).all()
 
     return list(device_ids)
+
+
+def get_storage_record_by_device_id_and_interval(
+    read_session: Session,
+    device_id: int,
+    flow_start_datetime: datetime.date,
+) -> StorageRecord | None:
+    """Retrieve all Storage Records for the specified device within a date range."""
+
+    # Query the database for storage records for the specified device and time interval
+    query: SelectOfScalar = select(StorageRecord).where(
+        StorageRecord.device_id == device_id,
+        StorageRecord.flow_start_datetime == flow_start_datetime,
+    )
+
+    storage_record = read_session.exec(query).all()
+
+    if len(storage_record) > 1:
+        raise ValueError(
+            f"Multiple storage records found for device ID {device_id} and flow start datetime {flow_start_datetime}."
+        )
+
+    return storage_record[0] if storage_record else None
+
+
+def get_allocated_storage_records_for_storage_record_id(
+    read_session: Session,
+    storage_record_id: int,
+) -> list[AllocatedStorageRecord] | None:
+    """Retrieve all Allocated Storage Records for the specified Storage Record ID."""
+
+    # Query the database for allocated storage records for the specified storage record ID
+    query: SelectOfScalar = select(AllocatedStorageRecord).where(
+        AllocatedStorageRecord.scr_allocation_id
+        == storage_record_id | AllocatedStorageRecord.sdr_allocation_id
+        == storage_record_id,
+        ~AllocatedStorageRecord.is_deleted,
+    )
+
+    allocated_storage_records = read_session.exec(query).all()
+
+    return allocated_storage_records
 
 
 def get_allocated_storage_records_by_device_id(
@@ -211,8 +252,37 @@ def create_allocated_storage_records_from_submitted_data(
     return allocated_storage_records
 
 
+def get_max_certificate_id_by_device_id(
+    db_session: Session, device_id: int
+) -> int | None:
+    """Gets the maximum certificate ID from any bundle for a given device, excluding any withdrawn certificates.
+
+    Args:
+        db_session (Session): The database session
+        device_id (int): The device ID
+
+    Returns:
+        int | None: The maximum certificate ID
+    """
+
+    stmt: SelectOfScalar = select(
+        func.max(GranularCertificateBundle.certificate_bundle_id_range_end)
+    ).where(
+        GranularCertificateBundle.device_id == device_id,
+        GranularCertificateBundle.certificate_bundle_status
+        != CertificateStatus.WITHDRAWN,
+    )
+
+    max_certificate_id = db_session.exec(stmt).first()
+
+    if not max_certificate_id:
+        return None
+    else:
+        return int(max_certificate_id)
+
+
 def issue_sdgcs_against_allocated_records(
-    allocated_storage_record_ids: list[int],
+    allocated_storage_records: list[AllocatedStorageRecord],
     device: Device,
     account_id: int,
     write_session: Session = Depends(db.get_write_session),
@@ -221,12 +291,7 @@ def issue_sdgcs_against_allocated_records(
 ) -> list[SQLModel]:
     """Issue SDGCs against the specified allocated storage records."""
 
-    # Retrieve the allocated storage records
-    allocated_storage_records = read_session.exec(
-        select(AllocatedStorageRecord).where(
-            AllocatedStorageRecord.id.in_(allocated_storage_record_ids)  # type: ignore[union-attr]
-        )
-    ).all()
+    allocated_storage_record_ids = [record.id for record in allocated_storage_records]
 
     # Assert that all of the record IDs provided are valid
     if len(allocated_storage_records) != len(allocated_storage_record_ids):
@@ -235,6 +300,12 @@ def issue_sdgcs_against_allocated_records(
         }
         raise ValueError(
             f"One or more specified allocated storage record IDs do not exist: {missing_record_ids}"
+        )
+
+    # Check that all the allocated storage records have associated GC Bundles
+    if not all(record.gc_allocation_id for record in allocated_storage_records):
+        raise ValueError(
+            "All allocated storage records must have an associated GC Bundle ID."
         )
 
     # Retrieve the GC Bundles that have been cancelled and are associated with the allocated storage records
@@ -247,15 +318,6 @@ def issue_sdgcs_against_allocated_records(
             == CertificateStatus.CANCELLED,
         )
     ).all()
-
-    # Assert that the number of retrieved GC Bundles is equal to the number of allocated storage records
-    if len(cancelled_gc_bundles) != len(allocated_storage_records):
-        missing_gc_bundle_ids = {
-            record.gc_allocation_id for record in allocated_storage_records
-        } - {bundle.id for bundle in cancelled_gc_bundles}
-        raise ValueError(
-            f"One or more specified GC bundle IDs do not exist or have not been cancelled: {missing_gc_bundle_ids}"
-        )
 
     # Retrieve the associated SCRs/SDRs for the allocated storage records
     scr_ids = [record.scr_allocation_id for record in allocated_storage_records]

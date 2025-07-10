@@ -19,6 +19,7 @@ from gc_registry.certificate.schemas import (
     GranularCertificateBundleReadFull,
     GranularCertificateCancel,
     GranularCertificateImportResponse,
+    GranularCertificateCancelStorage,
     GranularCertificateQuery,
     GranularCertificateQueryRead,
     GranularCertificateTransfer,
@@ -28,7 +29,10 @@ from gc_registry.core.database import db, events
 from gc_registry.core.models.base import CertificateActionType, UserRoles
 from gc_registry.core.services import create_bundle_hash
 from gc_registry.device.models import Device
-from gc_registry.device.services import map_device_to_certificate_read
+from gc_registry.device.services import (
+    get_device_by_local_identifier,
+    map_device_to_certificate_read,
+)
 from gc_registry.logging_config import logger
 from gc_registry.user.models import User
 from gc_registry.user.validation import validate_user_access, validate_user_role
@@ -231,7 +235,7 @@ async def import_certificate_bundle(
 
 @router.post(
     "/transfer",
-    response_model=GranularCertificateAction,
+    response_model=GranularCertificateActionRead,
     status_code=202,
 )
 def certificate_bundle_transfer(
@@ -358,13 +362,48 @@ def certificate_bundle_cancellation(
             user_name = User.by_id(certificate_cancel.user_id, read_session).name
             certificate_cancel.beneficiary = f"{user_name}"
 
-        db_certificate_action = services.process_certificate_bundle_action(
+        certificate_action_read = services.process_certificate_bundle_action(
             certificate_cancel, write_session, read_session, esdb_client
         )
 
-        return db_certificate_action
+        return certificate_action_read
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post(
+    "/cancel_for_storage",
+    response_model=GranularCertificateActionRead,
+    status_code=202,
+)
+def certificate_bundle_cancellation_for_storage(
+    certificate_cancel: GranularCertificateCancelStorage,
+    current_user: User = Depends(get_current_user),
+    write_session: Session = Depends(db.get_write_session),
+    read_session: Session = Depends(db.get_read_session),
+    esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
+):
+    """Cancel a fixed number of certificates matched to the given filter parameters within the specified Account."""
+    validate_user_role(current_user, required_role=UserRoles.TRADING_USER)
+    validate_user_access(current_user, certificate_cancel.source_id, read_session)
+
+    storage_device = get_device_by_local_identifier(
+        read_session, certificate_cancel.storage_local_device_identifier
+    )
+
+    print(f"Storage device: {storage_device}")
+
+    if not storage_device:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Storage device not found for the provided local identifier: {certificate_cancel.storage_local_device_identifier}",
+        )
+
+    db_certificate_action = services.process_certificate_bundle_action(
+        certificate_cancel, write_session, read_session, esdb_client
+    )
+
+    return db_certificate_action
 
 
 @router.post(
