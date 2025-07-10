@@ -574,7 +574,7 @@ def test_read_certificate_bundle(
 
 
 def test_import_certificate_bundles(
-    import_device_json: str,
+    import_device_json: dict,
     api_client: TestClient,
     token: str,
     fake_db_account: Account,

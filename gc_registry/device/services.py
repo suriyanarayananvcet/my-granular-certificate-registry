@@ -118,11 +118,19 @@ def create_import_device(
     Returns:
         Device: The created device.
     """
+    # Check whether the device already exists
+    import_device = Device.by_name(device_dict["device_name"], read_session)
+    if import_device is not None:
+        return import_device
+
     logger.info(f"Creating import device: {device_dict}...")
     if "account_id" in device_dict:
         import_account_id = device_dict["account_id"]
     else:
-        import_account_id = Account.by_name("Import Account", read_session).id
+        import_account = Account.by_name("Import Account", read_session)
+        if import_account is None:
+            raise ValueError("Import account not found.")
+        import_account_id = import_account.id
         device_dict["account_id"] = import_account_id
 
     device_create = DeviceCreate.model_validate(device_dict)
@@ -130,6 +138,6 @@ def create_import_device(
     if device is None:
         raise ValueError("Could not create import device.")
 
-    logger.info(f"Created import device with ID {device[0].id}...")
-    device = cast(Device, device[0])
-    return device
+    logger.info("Created import device.")
+
+    return cast(Device, device[0])

@@ -321,7 +321,7 @@ def generic_import_account(write_session: Session, read_session: Session) -> Acc
 
 
 @pytest.fixture()
-def import_device_json(generic_import_account: Account) -> str:
+def import_device_json(generic_import_account: Account) -> dict:
     """Create a device JSON string."""
     return {
         "account_id": generic_import_account.id,

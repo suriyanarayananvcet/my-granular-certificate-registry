@@ -1111,18 +1111,14 @@ def import_gc_bundles(
     Returns:
         list[GranularCertificateBundle]: List of created GC bundles
     """
-    if isinstance(device_json, str):
-        device_json = json.loads(device_json)
-    if device_json.get("device_name") is None:
+    device_dict = json.loads(device_json)
+    if device_dict.get("device_name") is None:
         raise ValueError("Device name is required to import certificates.")
 
-    import_device = Device.by_name(device_json.get("device_name"), read_session)
-
     # If the device is not present, all details must be provided
-    if not import_device:
-        import_device = create_import_device(
-            device_json, write_session, read_session, esdb_client
-        )
+    import_device = create_import_device(
+        device_dict, write_session, read_session, esdb_client
+    )
 
     gc_df["device_id"] = import_device.id
     gc_df["account_id"] = account_id
@@ -1162,8 +1158,11 @@ def import_gc_bundles(
     gc_bundles_data = []
 
     # Retrieve existing bundles for the import device once for validation
+    if import_device.id is None:
+        raise ValueError("Import device ID is None. Cannot retrieve existing bundles.")
+
     existing_bundles = get_certificate_bundles_by_device_id(
-        read_session, import_device.id
+        read_session, int(import_device.id)
     )
 
     for _, row in gc_df.iterrows():
