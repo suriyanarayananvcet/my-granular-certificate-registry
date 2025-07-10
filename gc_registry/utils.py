@@ -126,8 +126,6 @@ def parse_import_file(filename: str | None, content: str) -> pd.DataFrame:
     Raises:
         ValueError: If the file format is not supported or parsing fails
     """
-    import json
-
     # Determine file type from filename extension
     file_type = None
     if filename:
