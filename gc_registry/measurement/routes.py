@@ -18,7 +18,7 @@ from gc_registry.core.models.base import UserRoles
 from gc_registry.device.meter_data.manual_submission import ManualSubmissionMeterClient
 from gc_registry.device.models import Device
 from gc_registry.logging_config import logger
-from gc_registry.measurement.models import MeasurementReport
+from gc_registry.measurement.models import MeasurementReport, validate_readings
 from gc_registry.measurement.schemas import (
     MeasurementReportBase,
     MeasurementReportRead,
@@ -58,7 +58,7 @@ def get_meter_readings_template(current_user: User = Depends(get_current_user)):
 @router.post("/submit_readings", response_model=MeasurementSubmissionResponse)
 async def submit_readings(
     file: UploadFile = File(...),
-    deviceID: int = Form(...),
+    device_id: int = Form(...),
     current_user: User = Depends(get_current_user),
     write_session: Session = Depends(db.get_write_session),
     read_session: Session = Depends(db.get_read_session),
@@ -75,7 +75,7 @@ async def submit_readings(
 
     Args:
         file (UploadFile): The CSV file containing meter readings
-        deviceID (int): The ID of the device the readings are for
+        device_id (int): The ID of the device the readings are for
 
     Returns:
         models.MeasurementSubmissionResponse: A summary of the readings submitted.
@@ -88,16 +88,23 @@ async def submit_readings(
 
     # Convert to DataFrame
     measurement_df = pd.read_csv(csv_file)
-    measurement_df["device_id"] = deviceID
+    measurement_df["device_id"] = device_id
+
+    passed, measurement_df, message = validate_readings(measurement_df)
+    if not passed:
+        raise HTTPException(
+            status_code=400,
+            detail=message,
+        )
 
     # Check that the device ID is associated with an account that the user has access to
-    device = Device.by_id(deviceID, read_session)
+    device = Device.by_id(device_id, read_session)
 
     logger.info(f"Device: {device}")
 
     if not device:
         raise HTTPException(
-            status_code=404, detail=f"Device with ID {deviceID} not found."
+            status_code=404, detail=f"Device with ID {device_id} not found."
         )
 
     validate_user_access(current_user, device.account_id, read_session)

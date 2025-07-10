@@ -10,29 +10,6 @@ from gc_registry.device.models import Device
 from gc_registry.storage.models import AllocatedStorageRecord
 
 
-@pytest.fixture
-def valid_storage_record_csv():
-    """Create a CSV string with valid storage record data."""
-    return (
-        "flow_start_datetime,flow_end_datetime,flow_energy,flow_energy_source,validator_id\n"
-        "2024-01-01T00:00:00Z,2024-01-01T01:00:00Z,-1000,GRID,0\n"
-        "2024-01-01T01:00:00Z,2024-01-01T02:00:00Z,-1200,GRID,1\n"
-        "2024-01-01T01:00:00Z,2024-01-01T02:00:00Z,1000,,2\n"
-        "2024-01-01T02:00:00Z,2024-01-01T03:00:00Z,-1500,SOLAR,3\n"
-        "2024-01-01T03:00:00Z,2024-01-01T04:00:00Z,600,,4\n"
-    )
-
-
-@pytest.fixture
-def valid_allocation_record_csv():
-    """Create a CSV string with valid allocation record data."""
-    return (
-        "scr_allocation_id,sdr_allocation_id,sdr_proportion,scr_allocation_methodology,gc_allocation_id,sdgc_allocation_id,efficiency_factor_methodology,efficiency_factor_interval_start,efficiency_factor_interval_end,storage_efficiency_factor\n"
-        "0,2,1.0,FIFO,,,EnergyTag Standard,2024-01-01 00:00:00,2025-01-01 00:00:00,0.87\n"
-        "1,4,0.5,FIFO,,,EnergyTag Standard,2024-01-01 00:00:00,2025-01-01 00:00:00,0.87\n"
-    )
-
-
 def test_submit_storage_records_success(
     api_client: TestClient,
     token_storage_validator: str,
@@ -48,14 +25,14 @@ def test_submit_storage_records_success(
 
     # Create form data
     data = {
-        "deviceID": str(fake_db_storage_device.id),
+        "device_id": str(fake_db_storage_device.id),
     }
 
     # Submit storage records
     storage_files = {"file": ("records.csv", records_csv_file, "text/csv")}
 
     response = api_client.post(
-        "/storage/submit_storage_records",
+        "/storage/storage_records",
         files=storage_files,
         data=data,
         headers={"Authorization": f"Bearer {token_storage_validator}"},
@@ -74,7 +51,7 @@ def test_submit_storage_records_success(
     # Submit allocation records
     allocation_files = {"file": ("allocations.csv", allocations_csv_file, "text/csv")}
     response = api_client.post(
-        "/storage/submit_allocation_records",
+        "/storage/allocated_storage_records",
         files=allocation_files,
         data=data,
         headers={"Authorization": f"Bearer {token_storage_validator}"},
@@ -82,15 +59,106 @@ def test_submit_storage_records_success(
 
     print(response.text)
 
-    # assert response.status_code == 201
-    # response_data = response.json()
-    # assert response_data["message"] == "Allocation records created successfully."
-    # assert response_data["total_records"] == 2
-
     assert response.status_code == 201
     response_data = response.json()
     assert response_data["message"] == "Allocation records created successfully."
     assert response_data["total_records"] == 2
+
+
+def test_submit_storage_charge_records_success(
+    api_client: TestClient,
+    token_storage_validator: str,
+    valid_storage_record_csv: str,
+    fake_db_storage_device: Device,
+    read_session: Session,
+):
+    """Test successful submission of storage charge records."""
+    records_csv_file = io.BytesIO(valid_storage_record_csv.encode("utf-8"))
+
+    data = {
+        "device_id": str(fake_db_storage_device.id),
+    }
+
+    storage_files = {"file": ("records.csv", records_csv_file, "text/csv")}
+
+    response = api_client.post(
+        "/storage/storage_records",
+        files=storage_files,
+        data=data,
+        headers={"Authorization": f"Bearer {token_storage_validator}"},
+    )
+
+    print(response.text)
+
+    assert response.status_code == 201
+    response_data = response.json()
+    assert response_data["message"] == "Storage records created successfully."
+
+    # now try submitting the CSV data with incorrect headers
+    invalid_csv_content = (
+        "device_id,flow_start,flow_end,flow_energy,validator_id\n"
+        f"{fake_db_storage_device.id},2024-01-01T00:00:00Z,2024-01-01T01:00:00Z,-1000,0\n"
+        f"{fake_db_storage_device.id},2024-01-01T01:00:00Z,2024-01-01T02:00:00Z,-1200,1\n"
+        f"{fake_db_storage_device.id},2024-01-01T01:00:00Z,2024-01-01T03:00:00Z,1000,2\n"
+        f"{fake_db_storage_device.id},2024-01-01T02:00:00Z,2024-01-01T04:00:00Z,-1500,3\n"
+        f"{fake_db_storage_device.id},2024-01-01T03:00:00Z,2024-01-01T05:00:00Z,600,4\n"
+    )
+
+    invalid_records_csv_file = io.BytesIO(invalid_csv_content.encode("utf-8"))
+
+    invalid_storage_files = {
+        "file": ("invalid_records.csv", invalid_records_csv_file, "text/csv")
+    }
+    response = api_client.post(
+        "/storage/storage_records",
+        files=invalid_storage_files,
+        data=data,
+        headers={"Authorization": f"Bearer {token_storage_validator}"},
+    )
+
+    print(response.text)
+
+    assert response.status_code == 400
+    response_data = response.json()
+    assert (
+        "Measurement DataFrame is missing required columns." in response_data["detail"]
+    )
+
+
+def test_submit_storage_records_invalid_timestamps(
+    api_client: TestClient,
+    token_storage_validator: str,
+    fake_db_storage_device: Device,
+    read_session: Session,
+):
+    """Test submission of storage records with invalid timestamps."""
+    # Create a CSV string with invalid timestamps
+    invalid_csv_content = (
+        "device_id,flow_start_datetime,flow_end_datetime,flow_energy,validator_id\n"
+        f"{fake_db_storage_device.id},invalid_date,2024-01-01T01:00:00Z,-1000,0\n"
+        f"{fake_db_storage_device.id},2024-01-01T01:00:00Z,invalid_date,-1200,1\n"
+    )
+
+    records_csv_file = io.BytesIO(invalid_csv_content.encode("utf-8"))
+
+    data = {
+        "device_id": str(fake_db_storage_device.id),
+    }
+
+    storage_files = {"file": ("invalid_records.csv", records_csv_file, "text/csv")}
+
+    response = api_client.post(
+        "/storage/storage_records",
+        files=storage_files,
+        data=data,
+        headers={"Authorization": f"Bearer {token_storage_validator}"},
+    )
+
+    print(response.text)
+
+    assert response.status_code == 400
+    response_data = response.json()
+    assert "Error parsing datetime columns:" in response_data["detail"]
 
 
 def test_get_allocated_storage_records_by_device_id(
