@@ -18,13 +18,14 @@ from gc_registry.core.models.base import UserRoles
 from gc_registry.device.meter_data.manual_submission import ManualSubmissionMeterClient
 from gc_registry.device.models import Device
 from gc_registry.logging_config import logger
-from gc_registry.measurement.models import MeasurementReport, validate_readings
+from gc_registry.measurement.models import MeasurementReport
 from gc_registry.measurement.schemas import (
     MeasurementReportBase,
     MeasurementReportRead,
     MeasurementReportUpdate,
     MeasurementSubmissionResponse,
 )
+from gc_registry.measurement.validation import validate_readings
 from gc_registry.user.models import User
 from gc_registry.user.validation import validate_user_access, validate_user_role
 
