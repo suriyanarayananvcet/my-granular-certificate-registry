@@ -133,7 +133,7 @@ class GranularCertificateBundleBase(BaseModel):
     )
 
     ### Storage Characteristics ###
-    is_storage: int = Field(
+    is_storage: bool = Field(
         description="Indicates whether the Device ID is associated with a storage Device.",
     )
     allocated_storage_record_id: int | None = Field(
