@@ -102,7 +102,7 @@ def validate_and_apply_account_whitelist_update(
                 select(AccountWhitelistLink).where(
                     AccountWhitelistLink.target_account_id == account.id,
                     AccountWhitelistLink.source_account_id == account_id_to_remove,
-                    AccountWhitelistLink.is_deleted == False,  # noqa: E712
+                    ~AccountWhitelistLink.is_deleted,
                 )
             ).first()
             if account_whitelist_link_to_remove is not None:

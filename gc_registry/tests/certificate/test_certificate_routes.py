@@ -7,6 +7,7 @@ from sqlmodel import Session
 from gc_registry.account.models import Account, AccountWhitelistLink
 from gc_registry.certificate.models import GranularCertificateBundle
 from gc_registry.certificate.services import create_issuance_id
+from gc_registry.device.models import Device
 from gc_registry.user.models import User
 
 
@@ -569,3 +570,28 @@ def test_read_certificate_bundle(
         response.json()["issuance_id"]
         == fake_db_granular_certificate_bundle.issuance_id
     )
+
+
+def test_cancel_for_storage(
+    fake_db_granular_certificate_bundle: GranularCertificateBundle,
+    api_client: TestClient,
+    fake_db_admin_user: User,
+    fake_db_account: Account,
+    fake_db_storage_device: Device,
+    token: str,
+) -> None:
+    # Test case 2: Cancel a certificate successfully
+    test_data_2: dict[str, Any] = {
+        "granular_certificate_bundle_ids": [fake_db_granular_certificate_bundle.id],
+        "user_id": fake_db_admin_user.id,
+        "source_id": fake_db_account.id,
+        "storage_local_device_identifier": fake_db_storage_device.local_device_identifier,
+    }
+
+    response = api_client.post(
+        "/certificate/cancel_for_storage/",
+        json=test_data_2,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 202

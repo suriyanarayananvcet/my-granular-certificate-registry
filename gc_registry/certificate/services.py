@@ -16,12 +16,16 @@ from gc_registry.certificate.models import (
     IssuanceMetaData,
 )
 from gc_registry.certificate.schemas import (
+    ActionOutcome,
+    ActionResult,
     CertificateStatus,
     GranularCertificateActionBase,
+    GranularCertificateActionRead,
     GranularCertificateBundleBase,
     GranularCertificateBundleCreate,
     GranularCertificateBundleRead,
     GranularCertificateCancel,
+    GranularCertificateCancelStorage,
     GranularCertificateClaim,
     GranularCertificateLock,
     GranularCertificateQuery,
@@ -35,8 +39,14 @@ from gc_registry.core.models.base import CertificateActionType
 from gc_registry.core.services import create_bundle_hash
 from gc_registry.device.meter_data.abstract_meter_client import AbstractMeterDataClient
 from gc_registry.device.models import Device
-from gc_registry.device.services import get_all_devices
+from gc_registry.device.services import get_all_devices, get_device_by_local_identifier
 from gc_registry.logging_config import logger
+from gc_registry.storage.schemas import AllocatedStorageRecordUpdate
+from gc_registry.storage.services import (
+    get_allocated_storage_records_for_storage_record_id,
+    get_storage_record_by_device_id_and_interval,
+    issue_sdgcs_against_allocated_records,
+)
 
 
 def get_certificate_bundles_by_id(
@@ -500,7 +510,7 @@ def process_certificate_bundle_action(
     write_session: Session,
     read_session: Session,
     esdb_client: EventStoreDBClient,
-) -> GranularCertificateAction | None:
+) -> GranularCertificateActionRead | None:
     """Process the given certificate action.
 
     Args:
@@ -531,6 +541,7 @@ def process_certificate_bundle_action(
         CertificateActionType.WITHDRAW: withdraw_certificates,
         CertificateActionType.LOCK: lock_certificates,
         CertificateActionType.RESERVE: reserve_certificates,
+        CertificateActionType.CANCEL_FOR_STORAGE: cancel_certificates_for_storage,
     }
 
     if valid_certificate_action.action_type not in certificate_action_functions.keys():
@@ -538,19 +549,25 @@ def process_certificate_bundle_action(
         logger.error(err_msg)
         raise ValueError(err_msg)
 
-    # try:
     action_function: Callable[..., Any] = certificate_action_functions[
         valid_certificate_action.action_type
     ]
-    action_function(certificate_action, write_session, read_session, esdb_client)
-    # except Exception as e:
-    #     logger.error(f"Error whilst processing certificate action: {str(e)}")
+    action_result = action_function(
+        certificate_action, write_session, read_session, esdb_client
+    )
 
     db_certificate_actions = GranularCertificateAction.create(
         valid_certificate_action, write_session, read_session, esdb_client
     )
 
-    return db_certificate_actions[0]  # type: ignore
+    if not db_certificate_actions:
+        raise ValueError("Could not create certificate action")
+
+    action_read = GranularCertificateActionRead(
+        action_result=action_result, **db_certificate_actions[0].model_dump()
+    )
+
+    return action_read
 
 
 def apply_bundle_quantity_or_percentage(
@@ -669,7 +686,7 @@ def query_certificate_bundles(
     # certificates
     stmt: SelectOfScalar = select(GranularCertificateBundle).where(
         GranularCertificateBundle.account_id == certificate_query.source_id,
-        GranularCertificateBundle.is_deleted == False,  # noqa
+        ~GranularCertificateBundle.is_deleted,
     )
 
     exclude = {"user_id", "localise_time", "source_id"}
@@ -743,7 +760,7 @@ def transfer_certificates(
     write_session: Session,
     read_session: Session,
     esdb_client: EventStoreDBClient,
-) -> None:
+) -> ActionResult | None:
     """Transfer a fixed number of certificates matched to the given filter parameters to the specified target Account.
 
     Args:
@@ -766,7 +783,7 @@ def transfer_certificates(
         select(AccountWhitelistLink.source_account_id).where(
             AccountWhitelistLink.target_account_id
             == certificate_bundle_action.target_id,
-            AccountWhitelistLink.is_deleted == False,  # noqa: E712
+            ~AccountWhitelistLink.is_deleted,
         )
     ).all()
     if certificate_bundle_action.source_id not in account_whitelist:
@@ -808,15 +825,19 @@ def transfer_certificates(
         )
         certificate.update(certificate_update, write_session, read_session, esdb_client)
 
-    return
+    return ActionResult(
+        action_type=CertificateActionType.TRANSFER,
+        action_result=ActionOutcome.SUCCESS,
+        details=f"Transferred {len(certificates_bundles_to_transfer)} certificates to account {certificate_bundle_action.target_id}.",
+    )
 
 
 def cancel_certificates(
-    certificate_transfer: GranularCertificateCancel,
+    certificate_cancel: GranularCertificateCancel,
     write_session: Session,
     read_session: Session,
     esdb_client: EventStoreDBClient,
-) -> None:
+) -> ActionResult | None:
     """Cancel certificates matched to the given filter parameters.
 
     Args:
@@ -829,7 +850,7 @@ def cancel_certificates(
 
     # Retrieve certificates to cancel
     certificate_bundles_from_query = get_certificate_bundles_by_id(
-        certificate_transfer.granular_certificate_bundle_ids, write_session
+        certificate_cancel.granular_certificate_bundle_ids, write_session
     )
 
     if not certificate_bundles_from_query:
@@ -849,7 +870,7 @@ def cancel_certificates(
     # Split bundles if required, but only if certificate_quantity or percentage is provided
     certificates_bundles_to_cancel = apply_bundle_quantity_or_percentage(
         certificate_bundles_from_query,
-        certificate_transfer,
+        certificate_cancel,
         write_session,
         read_session,
         esdb_client,
@@ -859,11 +880,131 @@ def cancel_certificates(
     for certificate in certificates_bundles_to_cancel:
         certificate_update = GranularCertificateBundleUpdate(
             certificate_bundle_status=CertificateStatus.CANCELLED,
-            beneficiary=certificate_transfer.beneficiary,
+            beneficiary=certificate_cancel.beneficiary,
         )
         certificate.update(certificate_update, write_session, read_session, esdb_client)
 
-    return
+    return ActionResult(
+        action_type=CertificateActionType.CANCEL,
+        action_result=ActionOutcome.SUCCESS,
+        details=f"Cancelled {len(certificates_bundles_to_cancel)} certificates.",
+    )
+
+
+def cancel_certificates_for_storage(
+    certificate_cancel: GranularCertificateCancelStorage,
+    write_session: Session,
+    read_session: Session,
+    esdb_client: EventStoreDBClient,
+) -> ActionResult | None:
+    """Cancel certificates for storage matched to the given filter parameters.
+    Args:
+        certificate_cancel (GranularCertificateCancelStorage): The certificate cancel action
+        write_session (Session): The database write session
+        read_session (Session): The database read session
+        esdb_client (EventStoreDBClient): The EventStoreDB client
+    """
+
+    # Retrieve certificates to cancel
+    certificate_bundles_from_query = get_certificate_bundles_by_id(
+        certificate_cancel.granular_certificate_bundle_ids, write_session
+    )
+
+    if not certificate_bundles_from_query:
+        err_msg = "No certificates found to cancel with given query parameters."
+        logger.error(err_msg)
+        raise ValueError(err_msg)
+
+    valid_statuses = [CertificateStatus.ACTIVE, CertificateStatus.RESERVED]
+    if any(
+        c.certificate_bundle_status not in valid_statuses
+        for c in certificate_bundles_from_query
+    ):
+        err_msg = f"Certificates must be in ACTIVE or RESERVED status to cancel, found: { {c.certificate_bundle_status for c in certificate_bundles_from_query} }"
+        logger.error(err_msg)
+        raise ValueError(err_msg)
+
+    # get the storage device by local device identifier
+    storage_device = get_device_by_local_identifier(
+        read_session, certificate_cancel.storage_local_device_identifier
+    )
+
+    if not storage_device:
+        err_msg = f"Storage device with local identifier {certificate_cancel.storage_local_device_identifier} not found."
+        logger.error(err_msg)
+        raise ValueError(err_msg)
+
+    # Split bundles if required, but only if certificate_quantity or percentage is provided
+    certificates_bundles_to_cancel = apply_bundle_quantity_or_percentage(
+        certificate_bundles_from_query,
+        certificate_cancel,
+        write_session,
+        read_session,
+        esdb_client,
+    )
+
+    # Cancel certificates and issue SDGCs against allocated storage records where applicable
+    allocated_storage_records: list[SQLModel] = []
+
+    for certificate in certificates_bundles_to_cancel:
+        beneficiary = (
+            f"for storage: {certificate_cancel.storage_local_device_identifier}"
+        )
+
+        certificate_update = GranularCertificateBundleUpdate(
+            certificate_bundle_status=CertificateStatus.CANCELLED_FOR_STORAGE,
+            beneficiary=beneficiary,
+        )
+        certificate.update(certificate_update, write_session, read_session, esdb_client)
+
+        # 1. Check if storage records exist
+        storage_record = get_storage_record_by_device_id_and_interval(
+            read_session,
+            certificate.device_id,
+            certificate.production_starting_interval,
+        )
+        if storage_record is None or storage_record.id is None:
+            # Cancel certificate and continue to next
+            continue
+
+        if not storage_record.is_charging:
+            raise ValueError(
+                f"Storage record for device {certificate.device_id} and interval {certificate.production_starting_interval} is not a charging."
+            )
+
+        allocated_storage_record = get_allocated_storage_records_for_storage_record_id(
+            read_session, storage_record.id
+        )
+        if not allocated_storage_record:
+            continue
+
+        # Update storage record with the cancelled certificate
+        for asr in allocated_storage_record:
+            asr_update = AllocatedStorageRecordUpdate(gc_allocation_id=certificate.id)
+            updated_asr = asr.update(
+                asr_update,
+                write_session,
+                read_session,
+                esdb_client,
+            )
+            if updated_asr:
+                allocated_storage_records.append(updated_asr)
+
+    if allocated_storage_records:
+        issued_sdgcs = issue_sdgcs_against_allocated_records(
+            allocated_storage_records=allocated_storage_records,  # type: ignore
+            device=storage_device,
+            account_id=storage_device.account_id,
+            write_session=write_session,
+            read_session=read_session,
+            esdb_client=esdb_client,
+        )
+
+    return ActionResult(
+        action_type=CertificateActionType.CANCEL_FOR_STORAGE,
+        action_result=ActionOutcome.SUCCESS,
+        details=f"Cancelled {len(certificates_bundles_to_cancel)} certificates for storage and issued {len(issued_sdgcs)} SDGCs.",
+    )
 
 
 def claim_certificates(
@@ -871,7 +1012,7 @@ def claim_certificates(
     write_session: Session,
     read_session: Session,
     esdb_client: EventStoreDBClient,
-) -> None:
+) -> ActionResult | None:
     """Claim certificates matched to the given filter parameters.
 
     Args:
@@ -921,7 +1062,11 @@ def claim_certificates(
 
         certificate.update(certificate_update, write_session, read_session, esdb_client)
 
-    return
+    return ActionResult(
+        action_type=CertificateActionType.CLAIM,
+        action_result=ActionOutcome.SUCCESS,
+        details=f"Claimed {len(certificates_bundles_to_claim)} certificates.",
+    )
 
 
 def withdraw_certificates(
@@ -929,7 +1074,7 @@ def withdraw_certificates(
     write_session: Session,
     read_session: Session,
     esdb_client: EventStoreDBClient,
-) -> None:
+) -> ActionResult | None:
     """Withdraw certificates matched to the given filter parameters.
 
     Args:
@@ -968,7 +1113,11 @@ def withdraw_certificates(
         )
         certificate.update(certificate_update, write_session, read_session, esdb_client)
 
-    return
+    return ActionResult(
+        action_type=CertificateActionType.WITHDRAW,
+        action_result=ActionOutcome.SUCCESS,
+        details=f"Withdrawn {len(certificates_bundles_to_withdraw)} certificates.",
+    )
 
 
 def lock_certificates(
@@ -976,7 +1125,7 @@ def lock_certificates(
     write_session: Session,
     read_session: Session,
     esdb_client: EventStoreDBClient,
-) -> None:
+) -> ActionResult | None:
     """Lock certificates matched to the given filter parameters.
 
     Args:
@@ -1016,7 +1165,11 @@ def lock_certificates(
         )
         certificate.update(certificate_update, write_session, read_session, esdb_client)
 
-    return
+    return ActionResult(
+        action_type=CertificateActionType.LOCK,
+        action_result=ActionOutcome.SUCCESS,
+        details=f"Locked {len(certificates_bundles_to_lock)} certificates.",
+    )
 
 
 def reserve_certificates(
@@ -1024,7 +1177,7 @@ def reserve_certificates(
     write_session: Session,
     read_session: Session,
     esdb_client: EventStoreDBClient,
-) -> None:
+) -> ActionResult | None:
     """Reserve certificates matched to the given filter parameters.
 
     Args:
@@ -1061,7 +1214,11 @@ def reserve_certificates(
         )
         certificate.update(certificate_update, write_session, read_session, esdb_client)
 
-    return
+    return ActionResult(
+        action_type=CertificateActionType.RESERVE,
+        action_result=ActionOutcome.SUCCESS,
+        details=f"Reserved {len(certificates_bundles_to_reserve)} certificates.",
+    )
 
 
 def get_latest_issuance_metadata(db_session: Session) -> IssuanceMetaData | None:

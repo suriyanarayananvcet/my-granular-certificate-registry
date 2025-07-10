@@ -446,7 +446,7 @@ def fake_db_storage_device(
         "grid": "fake_grid",
         "energy_source": EnergySourceType.battery_storage,
         "technology_type": DeviceTechnologyType.battery_storage,
-        "local_device_identifier": "BMU-XYZ",
+        "local_device_identifier": "BMU-ST-XYZ",
         "capacity": 1000,
         "account_id": fake_db_account_storage_validator.id,
         "location": "USA",
