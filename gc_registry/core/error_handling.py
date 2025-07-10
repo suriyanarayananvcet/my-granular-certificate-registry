@@ -1,9 +1,9 @@
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 from fastapi import Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ def format_validation_error(error: RequestValidationError) -> ErrorResponse:
 
 async def validation_exception_handler(
     request: Request, exc: RequestValidationError
-) -> JSONResponse:
+) -> Union[Response, JSONResponse]:
     """Handle Pydantic validation errors."""
     error_response = format_validation_error(exc)
     logger.warning(f"Validation error: {error_response.to_dict()}")
@@ -61,7 +61,7 @@ async def validation_exception_handler(
 
 async def http_exception_handler(
     request: Request, exc: StarletteHTTPException
-) -> JSONResponse:
+) -> Union[Response, JSONResponse]:
     """Handle HTTP exceptions."""
     error_response = ErrorResponse(
         status_code=exc.status_code, message=str(exc.detail), error_type="http_error"
@@ -72,7 +72,9 @@ async def http_exception_handler(
     )
 
 
-async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+async def general_exception_handler(
+    request: Request, exc: Exception
+) -> Union[Response, JSONResponse]:
     """Handle all other exceptions."""
     error_response = ErrorResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

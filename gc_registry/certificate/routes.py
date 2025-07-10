@@ -1,7 +1,11 @@
+from pathlib import Path
+
 from esdbclient import EventStoreDBClient
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from sqlmodel import Session
 
+from gc_registry.account.services import get_account_by_id
 from gc_registry.authentication.services import get_current_user
 from gc_registry.certificate.models import (
     GranularCertificateAction,
@@ -15,6 +19,7 @@ from gc_registry.certificate.schemas import (
     GranularCertificateBundleReadFull,
     GranularCertificateCancel,
     GranularCertificateCancelStorage,
+    GranularCertificateImportResponse,
     GranularCertificateQuery,
     GranularCertificateQueryRead,
     GranularCertificateTransfer,
@@ -31,6 +36,7 @@ from gc_registry.device.services import (
 from gc_registry.logging_config import logger
 from gc_registry.user.models import User
 from gc_registry.user.validation import validate_user_access, validate_user_role
+from gc_registry.utils import parse_import_file
 
 from . import services
 
@@ -98,6 +104,131 @@ def create_issuance_metadata(
         db_issuance_metadata = db_issuance_metadata[0].model_dump()  # type: ignore
 
         return db_issuance_metadata
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/certificate_import_template", response_class=FileResponse)
+def get_import_template(current_user: User = Depends(get_current_user)):
+    """Return a template CSV file for importing GC bundles."""
+    template_path = (
+        Path(__file__).parent.parent / "static" / "templates" / "gc_import_template.csv"
+    )
+
+    if not template_path.exists():
+        raise HTTPException(status_code=404, detail="Template file not found.")
+
+    return FileResponse(
+        path=template_path,
+        filename="gc_import_template.csv",
+        media_type="text/csv",
+    )
+
+
+@router.post(
+    "/import",
+    response_model=GranularCertificateImportResponse,
+    status_code=201,
+)
+async def import_certificate_bundle(
+    account_id: int = Form(...),
+    file: UploadFile = File(...),
+    device_json: str = Form(...),
+    current_user: User = Depends(get_current_user),
+    write_session: Session = Depends(db.get_write_session),
+    read_session: Session = Depends(db.get_read_session),
+    esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
+) -> GranularCertificateImportResponse:
+    """Simplified implementation of import functionality for GC bundles into GCOS.
+
+    This endpoint accepts a CSV or JSON file containing GC bundles and imports them into the database,
+    associating them with a generic import device and account as defined in `seed.py`.
+
+    The device_json parameters should be provided in the following contexts:
+    - Device not present on GCOS, first time importing for this device: full details must be provided
+    - Device not present on GCOS, but not the first time importing for this device: only the device name must be provided
+    - Device present on GCOS: only the device name must be provided
+
+    Supported file formats:
+    - CSV: Standard comma-separated values with headers
+    - JSON: Array of objects format, e.g., [{"column1": "value1", "column2": "value2"}, ...]
+
+    It is assumed that the device that originally was issued the GC bundles is not present
+    on GCOS - an instance of the device will be created from the import file data provided
+    but linked to a generic import account that is inaccessible to users.
+
+    To prevent double counting, we also assume that the GC bundles are issued according
+    to the EnergyTag Standard, and as such, will have a unique issuance ID associated
+    with the originating device and a consistent set of bundle range start and end IDs.
+
+    Example request structure using a CSV file through Python:
+
+    device_data = {
+        "device_name": "Solar Farm 1",
+        "local_device_identifier": "SF001",
+        "grid": "ERCOT",
+        "energy_source": "solar_pv",
+        "technology_type": "photovoltaic",
+        "operational_date": "2020-01-01",
+        "capacity": 50.0,
+        "location": "Texas, USA",
+        "is_storage": False
+    }
+
+    with open('path/to/certificates.csv', 'rb') as file:
+        files = {
+            'file': ('certificates.csv', file, 'text/csv')
+        }
+
+        data = {
+            'account_id': 123,
+            'device_json': json.dumps(device_data)  # Note: no extra nesting needed here
+        }
+
+        response = requests.post(
+            'http://your-api-url/import',
+            files=files,
+            data=data,
+            headers={
+                'Authorization': f'Bearer {your-jwt-token}'
+            }
+        )
+
+    Args:
+        account_id (int): The ID of the account to import the GCs to.
+        file (UploadFile): The CSV or JSON file containing the GCs to import.
+        device_json (str): JSON string containing device details to import the GCs to.
+
+    Returns:
+        GranularCertificateImportResponse: Information on the imported GC bundles and issuance metadata.
+    """
+    validate_user_role(current_user, required_role=UserRoles.STORAGE_VALIDATOR)
+
+    account = get_account_by_id(int(account_id), read_session)
+    if not account:
+        raise HTTPException(
+            status_code=404, detail=f"Account with ID {account_id} not found."
+        )
+    validate_user_access(current_user, account.id, read_session)
+
+    try:
+        # Read the uploaded file
+        contents = await file.read()
+        content_str = contents.decode("utf-8")
+
+        # Parse the file into a pandas DataFrame
+        gc_df = parse_import_file(file.filename, content_str)
+
+        gc_bundles = services.import_gc_bundles(
+            account_id, gc_df, device_json, write_session, read_session, esdb_client
+        )
+
+        return GranularCertificateImportResponse(
+            message="Certificate bundles imported successfully.",
+            number_of_imported_certificate_bundles=len(gc_bundles),
+            total_imported_energy=sum(bundle.bundle_quantity for bundle in gc_bundles),
+        )
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

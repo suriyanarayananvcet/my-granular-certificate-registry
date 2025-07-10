@@ -1,7 +1,9 @@
 import datetime
-from typing import Any, Hashable
+from typing import Any, Hashable, cast
 
 import pandas as pd
+from esdbclient import EventStoreDBClient
+from sqlmodel import Session
 
 from gc_registry.account.models import Account, AccountWhitelistLink
 from gc_registry.authentication.services import get_password_hash
@@ -19,6 +21,36 @@ from gc_registry.device.meter_data.elexon.elexon import ElexonClient
 from gc_registry.device.models import Device
 from gc_registry.logging_config import logger
 from gc_registry.user.models import User, UserAccountLink
+
+
+def create_generic_import_account(
+    write_session: Session, read_session: Session, esdb_client: EventStoreDBClient
+) -> Account:
+    """Create a generic import account for the GC import endpoint.
+
+    This account is used to link metadata from devices not registered on
+    GCOS by representing them as devices inaccessible to users,
+    solely to maintain foreign keys between imported GCs and the account
+    table. Checks first to see if the account already exists, and if not,
+    creates it. This account is not accessible to any users and cannot
+    receive transfers of issuances.
+    """
+
+    account = Account.by_name("Import Account", read_session)
+    if account:
+        return account
+
+    account_dict = {
+        "account_name": "Import Account",
+        "user_ids": [],
+    }
+    account_create = Account.create(
+        account_dict, write_session, read_session, esdb_client
+    )
+    if account_create is None:
+        raise ValueError("Could not create import account.")
+
+    return cast(Account, account_create[0])
 
 
 def seed_data():
@@ -73,6 +105,11 @@ def seed_data():
     trading_user = User.create(
         trading_user_dict, write_session, read_session, esdb_client
     )[0]
+
+    # Create a generic import account and device
+    _import_account = create_generic_import_account(
+        write_session, read_session, esdb_client
+    )
 
     # Create an Account to add the certificates to
     account_dict = {

@@ -211,8 +211,10 @@ def create_allocated_storage_records_from_submitted_data(
             validator_storage_records_df["id"] == allocation_record["scr_allocation_id"]
         )
         if sdr_mask.sum() > 1 or scr_mask.sum() > 1:
-            raise ValueError(f"Multiple storage records found for the specified allocation IDs: \
-                                {allocation_record['sdr_allocation_id']} and {allocation_record['scr_allocation_id']}")
+            raise ValueError(
+                f"Multiple storage records found for the specified allocation IDs: \
+                                {allocation_record['sdr_allocation_id']} and {allocation_record['scr_allocation_id']}"
+            )
 
         sdr = validator_storage_records_df.loc[allocation_record["sdr_allocation_id"]]
         scr = validator_storage_records_df.loc[allocation_record["scr_allocation_id"]]

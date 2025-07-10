@@ -121,7 +121,7 @@ def test_submit_storage_charge_records_success(
     assert response.status_code == 400
     response_data = response.json()
     assert (
-        "Measurement DataFrame is missing required columns." in response_data["detail"]
+        "Measurement DataFrame is missing required columns." in response_data["message"]
     )
 
 
@@ -158,7 +158,7 @@ def test_submit_storage_records_invalid_timestamps(
 
     assert response.status_code == 400
     response_data = response.json()
-    assert "Error parsing datetime columns:" in response_data["detail"]
+    assert "Error parsing datetime columns:" in response_data["message"]
 
 
 def test_get_allocated_storage_records_by_device_id(

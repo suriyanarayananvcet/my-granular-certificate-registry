@@ -134,7 +134,7 @@ class GranularCertificateBundleBase(BaseModel):
     )
 
     ### Storage Characteristics ###
-    is_storage: int = Field(
+    is_storage: bool = Field(
         description="Indicates whether the Device ID is associated with a storage Device.",
     )
     allocated_storage_record_id: int | None = Field(
@@ -190,6 +190,12 @@ class IssuanceMetaDataBase(BaseModel):
     )
     issue_market_zone: str = Field(
         description="References the bidding zone and/or market authority and/or price node within which the GC Bundle have been issued.",
+    )
+
+
+class IssuanceMetaDataRead(IssuanceMetaDataBase):
+    id: int = Field(
+        description="A unique ID assigned to this Issuance Metadata.",
     )
 
 
@@ -720,6 +726,16 @@ class GranularCertificateActionRead(GranularCertificateActionBase):
         primary_key=True,
         description="A unique ID assigned to this action.",
     )
+    action_result: ActionResult | None = Field(
+        default=None,
+        description="The result of the action that was performed, including the action type, outcome, and any details.",
+    )
+
+
+class GranularCertificateImportResponse(BaseModel):
+    message: str
+    number_of_imported_certificate_bundles: int
+    total_imported_energy: int
     action_result: ActionResult | None = Field(
         default=None,
         description="The result of the action that was performed, including the action type, outcome, and any details.",

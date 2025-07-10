@@ -1,5 +1,6 @@
 import datetime
-from typing import Any, Callable, Hashable
+import json
+from typing import Any, Callable, Hashable, cast
 
 import pandas as pd
 import pytz
@@ -32,14 +33,23 @@ from gc_registry.certificate.schemas import (
     GranularCertificateReserve,
     GranularCertificateTransfer,
     GranularCertificateWithdraw,
+    IssuanceMetaDataBase,
 )
-from gc_registry.certificate.validation import validate_granular_certificate_bundle
+from gc_registry.certificate.validation import (
+    validate_granular_certificate_bundle,
+    validate_imported_granular_certificate_bundle,
+)
 from gc_registry.core.database import cqrs, db, events
 from gc_registry.core.models.base import CertificateActionType
 from gc_registry.core.services import create_bundle_hash
 from gc_registry.device.meter_data.abstract_meter_client import AbstractMeterDataClient
 from gc_registry.device.models import Device
-from gc_registry.device.services import get_all_devices, get_device_by_local_identifier
+from gc_registry.device.services import (
+    create_import_device,
+    get_all_devices,
+    get_certificate_bundles_by_device_id,
+    get_device_by_local_identifier,
+)
 from gc_registry.logging_config import logger
 from gc_registry.storage.schemas import AllocatedStorageRecordUpdate
 from gc_registry.storage.services import (
@@ -520,7 +530,7 @@ def process_certificate_bundle_action(
         esdb_client (EventStoreDBClient): The EventStoreDB client
 
     Returns:
-        list[GranularCertificateAction]: The list of certificates processed
+        GranularCertificateAction: The certificate action processed
 
     """
 
@@ -552,6 +562,7 @@ def process_certificate_bundle_action(
     action_function: Callable[..., Any] = certificate_action_functions[
         valid_certificate_action.action_type
     ]
+
     action_result = action_function(
         certificate_action, write_session, read_session, esdb_client
     )
@@ -1239,3 +1250,132 @@ def get_latest_issuance_metadata(db_session: Session) -> IssuanceMetaData | None
         return None
     else:
         return latest_issuance_metadata
+
+
+def import_gc_bundles(
+    account_id: int,
+    gc_df: pd.DataFrame,
+    device_json: str,
+    write_session: Session,
+    read_session: Session,
+    esdb_client: EventStoreDBClient,
+) -> list[GranularCertificateBundle]:
+    """Import GC bundles from a CSV file.
+
+    Args:
+        account_id (int): The account ID to assign to the imported GCs
+        gc_df (pd.DataFrame): DataFrame containing both IssuanceMetaData and GranularCertificateBundle attributes
+        device_json (DeviceBase): Device details of the issuing device
+        write_session (Session): Database write session
+        read_session (Session): Database read session
+        esdb_client (EventStoreDBClient): EventStoreDB client
+
+    Returns:
+        list[GranularCertificateBundle]: List of created GC bundles
+    """
+    device_dict = json.loads(device_json)
+    if device_dict.get("device_name") is None:
+        raise ValueError("Device name is required to import certificates.")
+
+    # If the device is not present, all details must be provided
+    import_device = create_import_device(
+        device_dict, write_session, read_session, esdb_client
+    )
+
+    gc_df["device_id"] = import_device.id
+    gc_df["account_id"] = account_id
+
+    # Define the IssuanceMetaData fields
+    issuance_metadata_fields = list(IssuanceMetaDataBase.model_fields.keys())
+
+    # Create a mapping from unique IssuanceMetaData combinations to their IDs
+    metadata_mapping = {}
+
+    # Group by unique IssuanceMetaData combinations and create them
+    unique_metadata_groups = gc_df[issuance_metadata_fields].drop_duplicates()
+
+    for _, metadata_row in unique_metadata_groups.iterrows():
+        metadata_dict = metadata_row.to_dict()
+
+        metadata_records = IssuanceMetaData.create(
+            metadata_dict,
+            write_session,
+            read_session,
+            esdb_client,
+        )
+
+        if metadata_records is None:
+            raise ValueError(f"Could not create IssuanceMetaData for: {metadata_dict}")
+
+        metadata_record = cast(IssuanceMetaData, metadata_records[0])
+        metadata_id = metadata_record.id
+
+        # Create a hashable key for the metadata combination, replacing NaN values with None
+        metadata_key = tuple(
+            sorted((k, v if not pd.isna(v) else None) for k, v in metadata_dict.items())
+        )
+        metadata_mapping[metadata_key] = metadata_id
+
+    # Now create the GC bundles with the correct metadata_id
+    gc_bundles_data = []
+
+    # Retrieve existing bundles for the import device once for validation
+    if import_device.id is None:
+        raise ValueError("Import device ID is None. Cannot retrieve existing bundles.")
+
+    existing_bundles = get_certificate_bundles_by_device_id(
+        read_session, int(import_device.id)
+    )
+
+    for _, row in gc_df.iterrows():
+        # Create the metadata key for this row
+        metadata_key = tuple(
+            sorted(
+                (k, v if not pd.isna(v) else None)
+                for k, v in row[issuance_metadata_fields].to_dict().items()
+            )
+        )
+        metadata_id = metadata_mapping[metadata_key]
+
+        # Create the GC bundle data dict, excluding metadata fields and adding metadata_id
+        bundle_data = row.drop(issuance_metadata_fields).to_dict()
+
+        # Replace nan values with None
+        bundle_data = {k: (None if pd.isna(v) else v) for k, v in bundle_data.items()}
+
+        bundle_data["metadata_id"] = metadata_id
+        bundle_data["hash"] = create_bundle_hash(bundle_data, None)
+        bundle_data["certificate_bundle_status"] = CertificateStatus.ACTIVE
+        bundle_data["production_starting_interval"] = pd.to_datetime(
+            bundle_data["production_starting_interval"], utc=True
+        ).strftime("%Y-%m-%d %H:%M:%S")
+        bundle_data["production_ending_interval"] = pd.to_datetime(
+            bundle_data["production_ending_interval"], utc=True
+        ).strftime("%Y-%m-%d %H:%M:%S")
+        bundle_data["expiry_datestamp"] = pd.to_datetime(
+            bundle_data["expiry_datestamp"], utc=True
+        ).strftime("%Y-%m-%d")
+
+        # Validate the bundle range start and end IDs
+        validate_imported_granular_certificate_bundle(
+            bundle_data, existing_bundles, import_device
+        )
+
+        gc_bundles_data.append(bundle_data)
+
+    # Create the GC bundles
+    gc_bundles = GranularCertificateBundle.create(
+        gc_bundles_data,
+        write_session,
+        read_session,
+        esdb_client,
+    )
+
+    if gc_bundles is None:
+        raise ValueError("Could not create GC bundles.")
+
+    gc_bundles_cast = [
+        cast(GranularCertificateBundle, gc_bundle) for gc_bundle in gc_bundles
+    ]
+
+    return gc_bundles_cast

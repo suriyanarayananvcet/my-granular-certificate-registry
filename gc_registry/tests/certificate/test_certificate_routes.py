@@ -1,5 +1,7 @@
+import json
 from typing import Any
 
+import pandas as pd
 from esdbclient import EventStoreDBClient
 from fastapi.testclient import TestClient
 from sqlmodel import Session
@@ -570,6 +572,81 @@ def test_read_certificate_bundle(
         response.json()["issuance_id"]
         == fake_db_granular_certificate_bundle.issuance_id
     )
+
+
+def test_import_certificate_bundles(
+    import_device_json: dict,
+    api_client: TestClient,
+    token: str,
+    fake_db_account: Account,
+):
+    # Use the template CSV
+    gc_df = pd.read_csv("gc_registry/tests/data/test_import.csv")
+
+    # Test case 1: Successful import
+    response = api_client.post(
+        "/certificate/import",
+        headers={"Authorization": f"Bearer {token}"},
+        data={
+            "account_id": str(fake_db_account.id),
+            "device_json": json.dumps(import_device_json),
+        },
+        files={"file": ("test_import.csv", gc_df.to_csv(index=False))},
+    )
+    print(response.json())
+    assert response.status_code == 201
+    assert response.json()["message"] == "Certificate bundles imported successfully."
+
+    # Test case 2: Import with invalid account ID
+    response = api_client.post(
+        "/certificate/import",
+        headers={"Authorization": f"Bearer {token}"},
+        data={"account_id": str(50000), "device_json": json.dumps(import_device_json)},
+        files={"file": ("test_import.csv", gc_df.to_csv(index=False))},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["message"] == "Account with ID 50000 not found."
+
+    # Test case 3: Import with invalid start and end range IDs
+    gc_df_case_3 = gc_df.copy()
+    gc_df_case_3["certificate_bundle_id_range_start"] = 50000
+    gc_df_case_3["certificate_bundle_id_range_end"] = 49999
+
+    response = api_client.post(
+        "/certificate/import",
+        headers={"Authorization": f"Bearer {token}"},
+        data={
+            "account_id": str(fake_db_account.id),
+            "device_json": json.dumps(import_device_json),
+        },
+        files={"file": ("test_import.csv", gc_df_case_3.to_csv(index=False))},
+    )
+
+    assert response.status_code == 400
+    assert (
+        response.json()["message"]
+        == "bundle_quantity does not match criteria for equal"
+    )
+
+    # Test case 4: Import with invalid bundle quantity
+    gc_df_case_4 = gc_df.copy()
+    gc_df_case_4["bundle_quantity"] = 100
+
+    response = api_client.post(
+        "/certificate/import",
+        headers={"Authorization": f"Bearer {token}"},
+        data={
+            "account_id": str(fake_db_account.id),
+            "device_json": json.dumps(import_device_json),
+        },
+        files={"file": ("test_import.csv", gc_df_case_4.to_csv(index=False))},
+    )
+
+    assert response.status_code == 400
+    expected_message = "bundle_quantity does not match criteria for equal"
+    actual_message = response.json()["message"]
+    assert actual_message == expected_message
 
 
 def test_cancel_for_storage(

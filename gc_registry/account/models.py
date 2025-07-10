@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlmodel import Field, Relationship
+from sqlmodel import Field, Relationship, Session, select
 
 from gc_registry import utils
 from gc_registry.account.schemas import AccountBase
@@ -22,6 +22,10 @@ class Account(AccountBase, table=True):
         back_populates="accounts", link_model=UserAccountLink
     )
     devices: list["Device"] = Relationship(back_populates="account")
+
+    @classmethod
+    def by_name(cls, name: str, read_session: Session) -> "Account | None":
+        return read_session.exec(select(cls).where(cls.account_name == name)).first()
 
 
 class AccountWhitelistLink(utils.ActiveRecord, table=True):
