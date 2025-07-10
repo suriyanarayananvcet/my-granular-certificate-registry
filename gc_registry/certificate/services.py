@@ -48,7 +48,7 @@ from gc_registry.device.services import (
     create_import_device,
     get_all_devices,
     get_certificate_bundles_by_device_id,
-    get_device_by_local_identifier
+    get_device_by_local_identifier,
 )
 from gc_registry.logging_config import logger
 from gc_registry.storage.schemas import AllocatedStorageRecordUpdate
@@ -567,7 +567,7 @@ def process_certificate_bundle_action(
         certificate_action, write_session, read_session, esdb_client
     )
 
-    db_certificate_action = GranularCertificateAction.create(
+    db_certificate_actions = GranularCertificateAction.create(
         valid_certificate_action, write_session, read_session, esdb_client
     )
 

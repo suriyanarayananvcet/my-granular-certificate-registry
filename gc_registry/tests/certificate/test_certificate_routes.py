@@ -648,6 +648,7 @@ def test_import_certificate_bundles(
     actual_message = response.json()["message"]
     assert actual_message == expected_message
 
+
 def test_cancel_for_storage(
     fake_db_granular_certificate_bundle: GranularCertificateBundle,
     api_client: TestClient,

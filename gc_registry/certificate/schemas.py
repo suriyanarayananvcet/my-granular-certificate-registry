@@ -726,8 +726,12 @@ class GranularCertificateActionRead(GranularCertificateActionBase):
         primary_key=True,
         description="A unique ID assigned to this action.",
     )
+    action_result: ActionResult | None = Field(
+        default=None,
+        description="The result of the action that was performed, including the action type, outcome, and any details.",
+    )
 
-      
+
 class GranularCertificateImportResponse(BaseModel):
     message: str
     number_of_imported_certificate_bundles: int
