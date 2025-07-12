@@ -125,8 +125,14 @@ async def create_api_key(
         esdb_client=esdb_client,
     )
 
+    if api_key_record is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to create API key",
+        )
+
     return ApiKeyResponse(
-        id=api_key_record.id,
+        id=api_key_record.id,  # type: ignore
         name=api_key_record.name,
         key=api_key,  # This is the only time the plain key is returned
         expires=api_key_record.expires,
@@ -155,7 +161,7 @@ async def list_api_keys(
 
     return [
         ApiKeyInfo(
-            id=key.id,
+            id=key.id,  # type: ignore
             name=key.name,
             expires=key.expires,
             created_at=key.created_at,

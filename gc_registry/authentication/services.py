@@ -1,6 +1,7 @@
 import datetime
 import secrets
 from datetime import timedelta
+from typing import cast
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import (
@@ -11,6 +12,7 @@ from fastapi.security import (
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlmodel import Session, and_, select
+from sqlmodel.sql.expression import SelectOfScalar
 
 from gc_registry.authentication.models import ApiKey
 from gc_registry.authentication.schemas import APIKeyUpdate
@@ -169,7 +171,7 @@ async def get_current_user(
 
     # API-key path
     if api_key_credentials:
-        api_key = api_key_credentials.split("API Key ")[1]
+        api_key = str(api_key_credentials).split("API Key ")[1]
         if user := get_user_by_api_key(api_key, read_session):
             return user
         raise API_KEY_CREDENTIALS_EXCEPTION
@@ -300,9 +302,9 @@ def create_api_key_for_user(
 
     api_key_record = ApiKey.create(
         api_key_data, write_session, read_session, esdb_client
-    )[0]
+    )
 
-    return api_key, api_key_record
+    return api_key, cast(ApiKey, api_key_record[0])
 
 
 def get_user_api_keys(user_id: int, read_session: Session) -> list[ApiKey]:
@@ -337,7 +339,7 @@ def deactivate_api_key(
     Returns:
         ApiKey | None: The updated API key record, or None if not found/authorized.
     """
-    query = select(ApiKey).where(ApiKey.id == api_key_id)
+    query: SelectOfScalar = select(ApiKey).where(ApiKey.id == api_key_id)
     if user_id:
         query = query.where(ApiKey.user_id == user_id)
 
