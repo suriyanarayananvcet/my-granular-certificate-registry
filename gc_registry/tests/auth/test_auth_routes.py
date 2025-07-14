@@ -23,7 +23,7 @@ class TestAuthRoutes:
         assert response.json() == {
             "details": {},
             "error_type": "http_error",
-            "message": f"Password for '{fake_db_admin_user.email}' is incorrect.",
+            "error_message": f"Password for '{fake_db_admin_user.email}' is incorrect.",
             "status_code": 401,
         }
 
@@ -35,6 +35,6 @@ class TestAuthRoutes:
         assert response.json() == {
             "details": {},
             "error_type": "http_error",
-            "message": "User 'incorrect@wrong.com' not found.",
+            "error_message": "User 'incorrect@wrong.com' not found.",
             "status_code": 404,
         }
