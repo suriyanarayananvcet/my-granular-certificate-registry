@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Any, Callable, Generator
 
@@ -36,6 +37,11 @@ from gc_registry.user.models import User, UserAccountLink
 from gc_registry.utils import ActiveRecord
 
 load_dotenv()
+
+
+def pytest_configure(config):
+    logger = logging.getLogger("testcontainers")
+    logger.disabled = True
 
 
 @pytest.fixture()

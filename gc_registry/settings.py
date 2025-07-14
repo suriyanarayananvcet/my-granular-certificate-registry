@@ -66,6 +66,8 @@ class Settings(BaseSettings):
     CERTIFICATE_EXPIRY_YEARS: int = 2
     CAPACITY_MARGIN: float = 1.1
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    API_KEY_EXPIRE_DAYS: int = 365
+    API_KEY_MAX_EXPIRE_DAYS: int = 1095  # 3 years
     REFRESH_WARNING_MINS: int = 5
     LOG_LEVEL: str = "INFO"
     PROFILING_ENABLED: bool = False

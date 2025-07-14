@@ -29,6 +29,8 @@ class TestAuthServices:
     async def test_access_token(self, read_session: Session, fake_db_admin_user: User):
         access_token = create_access_token(data={"sub": fake_db_admin_user.email})
 
-        current_user = await get_current_user(access_token, read_session)
+        current_user = await get_current_user(
+            jwt_token=access_token, read_session=read_session
+        )
 
         assert current_user.name == fake_db_admin_user.name, "User not found from token"
