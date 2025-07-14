@@ -17,7 +17,6 @@ class TestApiKeyRoutes:
         key_payload = self._create_api_key(api_client, token)
         api_key_value = key_payload["key"]
         api_key_id = key_payload["id"]
-        print(f"key_payload: {key_payload}")
 
         # ---------------------------------------------------------------- list (Bearer)
         api_client.headers["Authorization"] = f"Bearer {token}"
