@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from sqlmodel import Field, SQLModel
 
 from gc_registry import utils
+from gc_registry.settings import settings
 
 
 class LoginRequest(BaseModel):
@@ -30,7 +31,7 @@ class ApiKeyRequest(BaseModel):
     name: str = Field(description="A descriptive name for the API key")
     expires_days: int | None = Field(
         default=None,
-        description="Number of days until the API key expires. If not provided, uses system default.",
+        description=f"Number of days until the API key expires. If not provided, uses system default of {settings.API_KEY_EXPIRE_DAYS} days; cannot be more than {settings.API_KEY_MAX_EXPIRE_DAYS} days.",
     )
 
 
