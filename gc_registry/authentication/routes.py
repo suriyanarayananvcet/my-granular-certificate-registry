@@ -100,6 +100,21 @@ async def create_api_key(
 ):
     """Create a new API key for the authenticated user.
 
+    Once a user has authenticated via the login endpoint with a username and password,
+    they can create an API key to use for API requests. As part of the request, the user
+    can specify an expiry date for the API key. If no expiry date is requested, then a default
+    expiry date is used, defined in the registry settings file.
+
+    The user can then use the API key in the request header in place of a username and password,
+    using the following format:
+
+    Authorization: API Key <key>
+
+    The user must also provide a descriptive name for the API key. This name is used to
+    identify the API key in the API key list endpoint. The user may also request to view
+    all of their active API keys through the user/api-keys endpoint. The user can also
+    deactivate an API key by reference to the API key ID through the user/api-key/<api_key_id> endpoint.
+
     Args:
         api_key_request (ApiKeyRequest): The API key creation request.
         current_user (User): The authenticated user.
