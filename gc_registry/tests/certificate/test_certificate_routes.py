@@ -38,13 +38,13 @@ def test_transfer_certificate(
     )
 
     assert response.status_code == 422
-    assert response.json() == {
-        "status_code": 422,
-        "message": "Validation error occurred",
-        "details": {
-            "body -> target_id": {"message": "Field required", "type": "missing"}
-        },
-        "error_type": "validation_error",
+    assert response.json()["details"]["errors"][0] == {
+        "ctx": {},
+        "field": "target_id",
+        "invalid_value": None,
+        "location": "body -> target_id",
+        "message": "Field required",
+        "type": "missing",
     }
 
     # Test case 2: Try to transfer a certificate without source_id
@@ -57,13 +57,13 @@ def test_transfer_certificate(
         headers={"Authorization": f"Bearer {token}"},
     )
 
-    assert response.json() == {
-        "status_code": 422,
-        "message": "Validation error occurred",
-        "details": {
-            "body -> source_id": {"message": "Field required", "type": "missing"}
-        },
-        "error_type": "validation_error",
+    assert response.json()["details"]["errors"][0] == {
+        "ctx": {},
+        "field": "source_id",
+        "invalid_value": None,
+        "location": "body -> source_id",
+        "message": "Field required",
+        "type": "missing",
     }
 
     # Test case 3: Transfer a certificate successfully
@@ -139,16 +139,15 @@ def test_transfer_certificate(
     )
 
     assert response.status_code == 422
-    assert response.json() == {
-        "status_code": 422,
-        "message": "Validation error occurred",
-        "details": {
-            "body -> certificate_bundle_percentage": {
-                "message": "Input should be less than or equal to 1",
-                "type": "less_than_equal",
-            }
+    assert response.json()["details"]["errors"][0] == {
+        "ctx": {
+            "le": 1.0,
         },
-        "error_type": "validation_error",
+        "field": "certificate_bundle_percentage",
+        "invalid_value": 1.5,
+        "location": "body -> certificate_bundle_percentage",
+        "message": "Input should be less than or equal to 1",
+        "type": "less_than_equal",
     }
 
     # Test case 6: Try to specify the action type
@@ -168,16 +167,8 @@ def test_transfer_certificate(
     )
 
     assert response.status_code == 422
-    assert response.json() == {
-        "status_code": 422,
-        "message": "Validation error occurred",
-        "details": {
-            "body": {
-                "message": "Value error, `action_type` cannot be set explicitly.",
-                "type": "value_error",
-            }
-        },
-        "error_type": "validation_error",
+    assert response.json()["details"]["errors"][0]["ctx"] == {
+        "error": "`action_type` cannot be set explicitly.",
     }
 
 
@@ -201,13 +192,13 @@ def test_cancel_certificate_no_source_id(
 
     assert response.status_code == 422
 
-    assert response.json() == {
-        "status_code": 422,
-        "message": "Validation error occurred",
-        "details": {
-            "body -> source_id": {"message": "Field required", "type": "missing"}
-        },
-        "error_type": "validation_error",
+    assert response.json()["details"]["errors"][0] == {
+        "ctx": {},
+        "field": "source_id",
+        "invalid_value": None,
+        "location": "body -> source_id",
+        "message": "Field required",
+        "type": "missing",
     }
 
 
@@ -272,16 +263,13 @@ def test_cancel_certificate_fraction(
     )
 
     assert response.status_code == 422
-    assert response.json() == {
-        "status_code": 422,
-        "message": "Validation error occurred",
-        "details": {
-            "body -> certificate_bundle_percentage": {
-                "message": "Input should be greater than 0",
-                "type": "greater_than",
-            }
-        },
-        "error_type": "validation_error",
+    assert response.json()["details"]["errors"][0] == {
+        "ctx": {"gt": 0.0},
+        "field": "certificate_bundle_percentage",
+        "invalid_value": 0,
+        "location": "body -> certificate_bundle_percentage",
+        "message": "Input should be greater than 0",
+        "type": "greater_than",
     }
 
 
@@ -329,13 +317,13 @@ def test_query_certificate_bundles(
     )
 
     assert response.status_code == 422
-    assert response.json() == {
-        "status_code": 422,
-        "message": "Validation error occurred",
-        "details": {
-            "body -> source_id": {"message": "Field required", "type": "missing"}
-        },
-        "error_type": "validation_error",
+    assert response.json()["details"]["errors"][0] == {
+        "ctx": {},
+        "field": "source_id",
+        "invalid_value": None,
+        "location": "body -> source_id",
+        "message": "Field required",
+        "type": "missing",
     }
 
     # Test case 3: Query certificates based on issuance_ids
@@ -382,7 +370,7 @@ def test_query_certificate_bundles(
     assert response.status_code == 422
     assert response.json() == {
         "status_code": 422,
-        "message": "Invalid issuance ID: 123-12-03-01 12:12:12.",
+        "error_message": "Invalid issuance ID: 123-12-03-01 12:12:12.",
         "details": {},
         "error_type": "http_error",
     }
@@ -403,10 +391,10 @@ def test_query_certificate_bundles(
 
     assert response.status_code == 422
     assert response.json() == {
+        "status_code": 422,
+        "error_message": "certificate_period_end must be greater than certificate_period_start.",
         "details": {},
         "error_type": "http_error",
-        "message": "certificate_period_end must be greater than certificate_period_start.",
-        "status_code": 422,
     }
 
     # Test case 6: Query certificates with invalid certificate_period_start and certificate_period_end > 30 days
@@ -426,7 +414,7 @@ def test_query_certificate_bundles(
     assert response.status_code == 422
     assert response.json() == {
         "status_code": 422,
-        "message": "Difference between certificate_period_start and certificate_period_end must be 30 days or less.",
+        "error_message": "Difference between certificate_period_start and certificate_period_end must be 30 days or less.",
         "details": {},
         "error_type": "http_error",
     }
@@ -449,7 +437,7 @@ def test_query_certificate_bundles(
     assert response.status_code == 422
     assert response.json() == {
         "status_code": 422,
-        "message": "Cannot provide issuance_ids with certificate_period_start or certificate_period_end.",
+        "error_message": "Cannot provide issuance_ids with certificate_period_start or certificate_period_end.",
         "details": {},
         "error_type": "http_error",
     }
@@ -469,20 +457,26 @@ def test_query_certificate_bundles(
     )
 
     assert response.status_code == 422
-    assert response.json() == {
-        "status_code": 422,
-        "message": "Validation error occurred",
-        "details": {
-            "body -> certificate_period_start": {
-                "message": "Input should be a valid datetime or date, invalid character in year",
-                "type": "datetime_from_date_parsing",
-            },
-            "body -> certificate_period_end": {
-                "message": "Input should be a valid datetime or date, invalid character in year",
-                "type": "datetime_from_date_parsing",
-            },
+    assert response.json()["details"]["errors"][0] == {
+        "ctx": {
+            "error": "invalid character in year",
         },
-        "error_type": "validation_error",
+        "field": "certificate_period_start",
+        "invalid_value": "a date string",
+        "location": "body -> certificate_period_start",
+        "message": "Input should be a valid datetime or date, invalid character in year",
+        "type": "datetime_from_date_parsing",
+    }
+
+    assert response.json()["details"]["errors"][1] == {
+        "ctx": {
+            "error": "invalid character in year",
+        },
+        "field": "certificate_period_end",
+        "invalid_value": "another date string",
+        "location": "body -> certificate_period_end",
+        "message": "Input should be a valid datetime or date, invalid character in year",
+        "type": "datetime_from_date_parsing",
     }
 
     # Test case 9: Try giving period start more than 30 days in the past with no end date
@@ -501,7 +495,7 @@ def test_query_certificate_bundles(
     assert response.status_code == 422
     assert response.json() == {
         "status_code": 422,
-        "message": "certificate_period_end must be provided if certificate_period_start is more than 30 days ago.",
+        "error_message": "certificate_period_end must be provided if certificate_period_start is more than 30 days ago.",
         "details": {},
         "error_type": "http_error",
     }
@@ -522,7 +516,7 @@ def test_query_certificate_bundles(
     assert response.status_code == 422
     assert response.json() == {
         "status_code": 422,
-        "message": "certificate_period_start must be provided if certificate_period_end is provided.",
+        "error_message": "certificate_period_start must be provided if certificate_period_end is provided.",
         "details": {},
         "error_type": "http_error",
     }
@@ -541,16 +535,15 @@ def test_query_certificate_bundles(
     )
 
     assert response.status_code == 422
-    assert response.json() == {
-        "status_code": 422,
-        "message": "Validation error occurred",
-        "details": {
-            "body -> energy_source": {
-                "message": "Input should be 'solar_pv', 'wind', 'hydro', 'biomass', 'nuclear', 'electrolysis', 'geothermal', 'battery_storage', 'chp' or 'other'",
-                "type": "enum",
-            }
+    assert response.json()["details"]["errors"][0] == {
+        "ctx": {
+            "expected": "'solar_pv', 'wind', 'hydro', 'biomass', 'nuclear', 'electrolysis', 'geothermal', 'battery_storage', 'chp' or 'other'",
         },
-        "error_type": "validation_error",
+        "field": "energy_source",
+        "invalid_value": "windy",
+        "location": "body -> energy_source",
+        "message": "Input should be 'solar_pv', 'wind', 'hydro', 'biomass', 'nuclear', 'electrolysis', 'geothermal', 'battery_storage', 'chp' or 'other'",
+        "type": "enum",
     }
 
 
@@ -606,7 +599,7 @@ def test_import_certificate_bundles(
     )
 
     assert response.status_code == 404
-    assert response.json()["message"] == "Account with ID 50000 not found."
+    assert response.json()["error_message"] == "Account with ID 50000 not found."
 
     # Test case 3: Import with invalid start and end range IDs
     gc_df_case_3 = gc_df.copy()
@@ -625,7 +618,7 @@ def test_import_certificate_bundles(
 
     assert response.status_code == 400
     assert (
-        response.json()["message"]
+        response.json()["error_message"]
         == "bundle_quantity does not match criteria for equal"
     )
 
@@ -645,7 +638,7 @@ def test_import_certificate_bundles(
 
     assert response.status_code == 400
     expected_message = "bundle_quantity does not match criteria for equal"
-    actual_message = response.json()["message"]
+    actual_message = response.json()["error_message"]
     assert actual_message == expected_message
 
 

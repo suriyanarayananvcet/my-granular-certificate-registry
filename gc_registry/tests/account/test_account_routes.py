@@ -75,7 +75,7 @@ class TestAccountRoutes:
         assert response.json() == {
             "details": {},
             "error_type": "http_error",
-            "message": "Account ID to add not found: 999",
+            "error_message": "Account ID to add not found: 999",
             "status_code": 404,
         }
 
@@ -92,7 +92,7 @@ class TestAccountRoutes:
         assert _updated_whitelist_response.json() == {
             "details": {},
             "error_type": "http_error",
-            "message": "Cannot add an account to its own whitelist.",
+            "error_message": "Cannot add an account to its own whitelist.",
             "status_code": 400,
         }
 
@@ -132,7 +132,7 @@ class TestAccountRoutes:
         assert response.json() == {
             "details": {},
             "error_type": "http_error",
-            "message": f"Account with id {incorrect_id} not found",
+            "error_message": f"Account with id {incorrect_id} not found",
             "status_code": 404,
         }
 
@@ -171,7 +171,7 @@ class TestAccountRoutes:
         assert response.json() == {
             "details": {},
             "error_type": "http_error",
-            "message": f"Account with id {fake_id} not found",
+            "error_message": f"Account with id {fake_id} not found",
             "status_code": 404,
         }
 

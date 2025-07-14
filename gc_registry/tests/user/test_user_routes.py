@@ -20,7 +20,7 @@ class TestUserRoutes:
         )
         assert res.status_code == 401
         assert res.json() == {
-            "message": "Invalid or expired JWT access-token",
+            "error_message": "Invalid or expired JWT access-token",
             "details": {},
             "status_code": 401,
             "error_type": "http_error",

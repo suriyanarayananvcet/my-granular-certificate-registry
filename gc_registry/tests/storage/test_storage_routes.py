@@ -121,7 +121,8 @@ def test_submit_storage_charge_records_success(
     assert response.status_code == 400
     response_data = response.json()
     assert (
-        "Measurement DataFrame is missing required columns." in response_data["message"]
+        "Measurement DataFrame is missing required columns."
+        in response_data["error_message"]
     )
 
 
@@ -158,7 +159,7 @@ def test_submit_storage_records_invalid_timestamps(
 
     assert response.status_code == 400
     response_data = response.json()
-    assert "Error parsing datetime columns:" in response_data["message"]
+    assert "Error parsing datetime columns:" in response_data["error_message"]
 
 
 def test_get_allocated_storage_records_by_device_id(
@@ -211,7 +212,7 @@ def test_get_allocated_storage_records_invalid_date_range_order(
 
     assert response.json() == {
         "status_code": 400,
-        "message": "created_after must be before created_before.",
+        "error_message": "created_after must be before created_before.",
         "details": {},
         "error_type": "http_error",
     }
@@ -239,7 +240,7 @@ def test_get_allocated_storage_records_date_range_too_large(
 
     assert response.json() == {
         "status_code": 400,
-        "message": "Date range cannot exceed 30 days.",
+        "error_message": "Date range cannot exceed 30 days.",
         "details": {},
         "error_type": "http_error",
     }
@@ -281,7 +282,7 @@ def test_unauthorized_user_role_access_denied(
     assert response.status_code == 403
     assert response.json() == {
         "status_code": 403,
-        "message": "User must be an Admin, Production or Storage Validator to perform this action.",
+        "error_message": "User must be an Admin, Production or Storage Validator to perform this action.",
         "details": {},
         "error_type": "http_error",
     }

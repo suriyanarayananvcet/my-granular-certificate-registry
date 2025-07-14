@@ -47,10 +47,10 @@ class TestApiKeyRoutes:
         api_client.headers["Authorization"] = "Bearer notatoken"
         jwt_resp = api_client.get("/auth/api-keys")
         assert jwt_resp.status_code == 401
-        assert jwt_resp.json()["message"] == "Invalid or expired JWT access-token"
+        assert jwt_resp.json()["error_message"] == "Invalid or expired JWT access-token"
 
         # Invalid API key
         api_client.headers["Authorization"] = "API Key not-a-real-key"
         key_resp = api_client.get("/auth/api-keys")
         assert key_resp.status_code == 401
-        assert key_resp.json()["message"] == "Invalid or expired API key"
+        assert key_resp.json()["error_message"] == "Invalid or expired API key"
