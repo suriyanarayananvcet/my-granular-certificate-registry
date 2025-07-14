@@ -39,7 +39,7 @@ from gc_registry.utils import ActiveRecord
 load_dotenv()
 
 
-def pytest_configure():
+def pytest_configure(config):
     logger = logging.getLogger("testcontainers")
     logger.disabled = True
 
