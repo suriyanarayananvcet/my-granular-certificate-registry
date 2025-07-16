@@ -379,7 +379,7 @@ def get_allocated_storage_records(
     if not created_after:
         created_after = (datetime.datetime.now() - datetime.timedelta(days=7)).date()
     if not created_before:
-        created_before = datetime.datetime.now().date()
+        created_before = (datetime.datetime.now() + datetime.timedelta(days=1)).date()
 
     # Validate the date range
     if created_after and created_before and created_after >= created_before:
