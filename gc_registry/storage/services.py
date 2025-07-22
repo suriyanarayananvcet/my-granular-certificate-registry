@@ -39,6 +39,8 @@ def get_device_ids_in_allocated_storage_records(read_session: Session) -> list[i
 def get_storage_records_by_device_id(
     device_id: int,
     read_session: Session,
+    start_datetime: datetime.datetime | None = None,
+    end_datetime: datetime.datetime | None = None,
 ) -> list[StorageRecord] | None:
     """Retrieve all Storage Records for the specified device."""
 
@@ -46,6 +48,12 @@ def get_storage_records_by_device_id(
         StorageRecord.device_id == device_id,
         ~StorageRecord.is_deleted,
     )
+
+    if start_datetime:
+        query = query.where(StorageRecord.flow_start_datetime >= start_datetime)
+
+    if end_datetime:
+        query = query.where(StorageRecord.flow_start_datetime <= end_datetime)
 
     storage_records = read_session.exec(query).all()
 
