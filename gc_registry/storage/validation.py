@@ -1,10 +1,15 @@
+from fastapi import HTTPException
 import pandas as pd
 from sqlmodel import Session, desc, select
 from sqlmodel.sql.expression import SelectOfScalar
 
+from gc_registry.account.services import get_accounts_by_user_id
 from gc_registry.certificate.models import GranularCertificateBundle
+from gc_registry.core.models.base import UserRoles
+from gc_registry.device.services import get_devices_by_account_id
 from gc_registry.settings import settings
 from gc_registry.storage.models import AllocatedStorageRecord, StorageRecord
+from gc_registry.user.models import User
 
 
 def get_latest_storage_record_by_device_id(
@@ -204,3 +209,30 @@ def validate_allocated_records_against_gc_bundles(
             )
 
     return
+
+
+def validate_access_to_devices(
+    device_ids: list[int],
+    current_user: User,
+    read_session: Session,
+):
+    """Validate that the user has access to the devices associated with the allocated storage records."""
+
+    user_accounts = get_accounts_by_user_id(current_user.id, read_session)
+    if not user_accounts:
+        raise ValueError("User does not have any associated accounts.")
+
+    if current_user.role in [UserRoles.ADMIN, UserRoles.PRODUCTION_USER]:
+        user_devices = []
+        for account in user_accounts:
+            account_devices = get_devices_by_account_id(account.id, read_session)
+            user_devices.extend(account_devices)
+
+        if not any(
+            device_id in [device.id for device in user_devices]
+            for device_id in device_ids
+        ):
+            invalid_devices = device_ids - [device.id for device in user_devices]
+            raise PermissionError(
+                f"User does not have permission to access devices with IDs {invalid_devices}."
+            )
