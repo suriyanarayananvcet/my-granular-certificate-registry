@@ -282,46 +282,6 @@ def issue_SDGCs(
     return issued_sdgcs
 
 
-@router.post(
-    "/withdraw_scr",
-    response_model=StorageActionResponse,
-    status_code=200,
-)
-def SCR_withdraw(
-    storage_action_base: StorageAction,
-    current_user: User = Depends(get_current_user),
-    write_session: Session = Depends(db.get_write_session),
-    read_session: Session = Depends(db.get_read_session),
-    esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
-):
-    """(Issuing Body only) - Withdraw a fixed number of SCRs from the specified Account matching the provided search criteria."""
-    scr_action = StorageAction.create(
-        storage_action_base, write_session, read_session, esdb_client
-    )
-
-    return scr_action
-
-
-@router.post(
-    "/withdraw_sdr",
-    response_model=StorageActionResponse,
-    status_code=200,
-)
-def SDR_withdraw(
-    storage_action_base: StorageAction,
-    current_user: User = Depends(get_current_user),
-    write_session: Session = Depends(db.get_write_session),
-    read_session: Session = Depends(db.get_read_session),
-    esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
-):
-    """(Issuing Body only) - Withdraw a fixed number of SDRs from the specified Account matching the provided search criteria."""
-    sdr_action = StorageAction.create(
-        storage_action_base, write_session, read_session, esdb_client
-    )
-
-    return sdr_action
-
-
 @router.get(
     "/allocated_storage_records/{device_id}",
     response_model=list[AllocatedStorageRecord],
