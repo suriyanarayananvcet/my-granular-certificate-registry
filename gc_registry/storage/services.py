@@ -19,6 +19,7 @@ from gc_registry.device.models import Device
 from gc_registry.settings import settings
 from gc_registry.storage.models import AllocatedStorageRecord, StorageRecord
 from gc_registry.storage.validation import (
+    validate_access_to_devices,
     validate_allocated_records,
     validate_allocated_records_against_gc_bundles,
 )
@@ -35,6 +36,37 @@ def get_device_ids_in_allocated_storage_records(read_session: Session) -> list[i
     return list(device_ids)
 
 
+def get_storage_records_by_device_id(
+    device_id: int,
+    read_session: Session,
+) -> list[StorageRecord] | None:
+    """Retrieve all Storage Records for the specified device."""
+
+    query: SelectOfScalar = select(StorageRecord).where(
+        StorageRecord.device_id == device_id,
+        ~StorageRecord.is_deleted,
+    )
+
+    storage_records = read_session.exec(query).all()
+
+    return storage_records
+
+
+def get_storage_records_by_id(
+    storage_record_ids: list[int],
+    read_session: Session,
+) -> list[StorageRecord] | None:
+    """Retrieve a Storage Record by its ID."""
+
+    query: SelectOfScalar = select(StorageRecord).where(
+        StorageRecord.id.in_(storage_record_ids), ~StorageRecord.is_deleted
+    )
+
+    storage_records = read_session.exec(query).all()
+
+    return storage_records
+
+
 def get_storage_record_by_device_id_and_interval(
     read_session: Session,
     device_id: int,
@@ -46,6 +78,7 @@ def get_storage_record_by_device_id_and_interval(
     query: SelectOfScalar = select(StorageRecord).where(
         StorageRecord.device_id == device_id,
         StorageRecord.flow_start_datetime == flow_start_datetime,
+        ~StorageRecord.is_deleted,
     )
 
     storage_record = read_session.exec(query).all()
@@ -56,6 +89,22 @@ def get_storage_record_by_device_id_and_interval(
         )
 
     return storage_record[0] if storage_record else None
+
+
+def get_allocated_storage_records_by_id(
+    allocated_storage_record_ids: list[int],
+    read_session: Session,
+) -> list[AllocatedStorageRecord] | None:
+    """Retrieve an Allocated Storage Record by its ID."""
+
+    query: SelectOfScalar = select(AllocatedStorageRecord).where(
+        AllocatedStorageRecord.id.in_(allocated_storage_record_ids),
+        ~AllocatedStorageRecord.is_deleted,
+    )
+
+    allocated_storage_records = read_session.exec(query).all()
+
+    return allocated_storage_records
 
 
 def get_allocated_storage_records_for_storage_record_id(
@@ -109,7 +158,7 @@ def create_charge_records_from_metering_data(
     storage_records_df["flow_energy"] = storage_records_df["flow_energy"].abs()
 
     # Create the storage records
-    _ = StorageRecord.create(
+    created_storage_records = StorageRecord.create(
         storage_records_df.to_dict(orient="records"),
         write_session,
         read_session,
@@ -133,6 +182,7 @@ def create_charge_records_from_metering_data(
         "total_discharge_energy": total_discharge_energy,
         "total_energy": total_energy,
         "total_records": total_records,
+        "record_ids": [record.id for record in created_storage_records],
         "message": "Storage records created successfully.",
     }
 
