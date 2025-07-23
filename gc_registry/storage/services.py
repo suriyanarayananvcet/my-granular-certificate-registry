@@ -302,7 +302,6 @@ def issue_sdgcs_against_allocated_records(
     sdr_records_df = pd.DataFrame(sdr_records)
 
     # Get the max certificate bundle ID for the specified device
-
     if not device.id:
         raise ValueError("Device ID not found.")
 
@@ -328,6 +327,27 @@ def issue_sdgcs_against_allocated_records(
 
     if not issued_sdgcs:
         raise ValueError("No SDGCs were created. Please check the input data.")
+
+    # Update the allocation records with the SDGC IDs
+    for allocated_storage_record in allocated_storage_records:
+        sdgc_id = next(
+            (
+                sdgc.id
+                for sdgc in issued_sdgcs
+                if sdgc["allocated_storage_record_id"] == allocated_storage_record.id
+            ),
+            None,
+        )
+        if sdgc_id:
+            allocated_storage_record.sdgc_allocation_id = sdgc_id
+        else:
+            raise ValueError(
+                f"No SDGC found for allocated storage record ID {allocated_storage_record.id}"
+            )
+
+    # Update the allocation records in the database
+    write_session.add_all(allocated_storage_records)
+    write_session.commit()
 
     return issued_sdgcs
 
@@ -358,6 +378,7 @@ def map_allocation_to_certificates(
 
         transformed = {
             "account_id": account_id,
+            "allocated_storage_record_id": sdgc["allocated_storage_record_id"],
             "certificate_bundle_status": CertificateStatus.ACTIVE,
             "certificate_bundle_id_range_start": certificate_bundle_id_range_start,
             "certificate_bundle_id_range_end": certificate_bundle_id_range_end,
