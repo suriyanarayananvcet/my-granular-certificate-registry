@@ -1,4 +1,3 @@
-from fastapi import HTTPException
 import pandas as pd
 from sqlmodel import Session, desc, select
 from sqlmodel.sql.expression import SelectOfScalar
@@ -9,7 +8,7 @@ from gc_registry.core.models.base import UserRoles
 from gc_registry.device.services import get_devices_by_account_id
 from gc_registry.settings import settings
 from gc_registry.storage.models import AllocatedStorageRecord, StorageRecord
-from gc_registry.storage.services import get_storage_records_by_device_id
+from gc_registry.storage.utils import get_storage_records_by_device_id
 from gc_registry.user.models import User
 
 

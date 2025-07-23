@@ -17,32 +17,31 @@ from fastapi import (
 from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 
-from gc_registry.account.services import get_accounts_by_user_id
 from gc_registry.authentication.services import get_current_user
 from gc_registry.certificate.models import GranularCertificateBundle
 from gc_registry.core.database import db, events
 from gc_registry.core.models.base import UserRoles
 from gc_registry.device.models import Device
-from gc_registry.device.services import get_device_by_id, get_devices_by_account_id
+from gc_registry.device.services import get_device_by_id
 from gc_registry.logging_config import logger
 from gc_registry.storage.models import (
     AllocatedStorageRecord,
-    StorageAction,
     StorageRecord,
 )
 from gc_registry.storage.schemas import (
     AllocatedStorageRecordSubmissionResponse,
-    StorageActionResponse,
     StorageRecordSubmissionResponse,
 )
 from gc_registry.storage.services import (
     create_allocated_storage_records_from_submitted_data,
     create_charge_records_from_metering_data,
+    issue_sdgcs_against_allocated_records,
+)
+from gc_registry.storage.utils import (
     get_allocated_storage_records_by_device_id,
     get_allocated_storage_records_by_id,
     get_device_ids_in_allocated_storage_records,
     get_storage_records_by_id,
-    issue_sdgcs_against_allocated_records,
 )
 from gc_registry.storage.validation import (
     validate_access_to_devices,
@@ -345,7 +344,7 @@ def issue_SDGCs(
 
 
 @router.get(
-    "/allocated_storage_records",
+    "/allocated_storage_records_by_id",
     response_model=list[AllocatedStorageRecord],
     status_code=200,
 )
@@ -406,6 +405,9 @@ def get_allocated_storage_records(
     read_session: Session = Depends(db.get_read_session),
 ):
     """Retrieve all allocated storage records."""
+
+    if current_user.role != UserRoles.STORAGE_VALIDATOR:
+        validate_user_role(current_user, required_role=UserRoles.PRODUCTION_USER)
 
     # check that the device_id is valid
     device_ids = get_device_ids_in_allocated_storage_records(read_session)
