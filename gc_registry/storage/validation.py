@@ -227,11 +227,14 @@ def validate_allocated_records_against_gc_bundles(
 
 
 def validate_access_to_devices(
-    device_ids: list[int],
+    device_ids: list[int] | set[int],
     current_user: User,
     read_session: Session,
 ):
     """Validate that the user has access to the devices associated with the allocated storage records."""
+
+    if isinstance(device_ids, list):
+        device_ids = set(device_ids)
 
     user_accounts = get_accounts_by_user_id(current_user.id, read_session)
     if not user_accounts:
@@ -243,11 +246,9 @@ def validate_access_to_devices(
             account_devices = get_devices_by_account_id(account.id, read_session)
             user_devices.extend(account_devices)
 
-        if not any(
-            device_id in [device.id for device in user_devices]
-            for device_id in device_ids
-        ):
-            invalid_devices = device_ids - [device.id for device in user_devices]
+        user_device_ids = {device.id for device in user_devices}
+        if not any(device_id in user_device_ids for device_id in device_ids):
+            invalid_devices = device_ids - user_device_ids
             raise PermissionError(
                 f"User does not have permission to access devices with IDs {invalid_devices}."
             )

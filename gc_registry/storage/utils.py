@@ -48,7 +48,8 @@ def get_storage_records_by_id(
     """Retrieve a Storage Record by its ID."""
 
     query: SelectOfScalar = select(StorageRecord).where(
-        StorageRecord.id.in_(storage_record_ids), ~StorageRecord.is_deleted
+        StorageRecord.id.in_(storage_record_ids),  # type: ignore
+        ~StorageRecord.is_deleted,
     )
 
     storage_records = read_session.exec(query).all()
@@ -87,7 +88,7 @@ def get_allocated_storage_records_by_id(
     """Retrieve an Allocated Storage Record by its ID."""
 
     query: SelectOfScalar = select(AllocatedStorageRecord).where(
-        AllocatedStorageRecord.id.in_(allocated_storage_record_ids),
+        AllocatedStorageRecord.id.in_(allocated_storage_record_ids),  # type: ignore
         ~AllocatedStorageRecord.is_deleted,
     )
 

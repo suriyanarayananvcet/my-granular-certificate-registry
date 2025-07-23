@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, Hashable
+from typing import Any, Hashable, cast
 
 import pandas as pd
 from esdbclient import EventStoreDBClient
@@ -43,6 +43,8 @@ def create_charge_records_from_metering_data(
         esdb_client,
     )
 
+    created_storage_records_cast = cast(list[StorageRecord], created_storage_records)
+
     # Calculate summary values
     total_charge_energy = storage_records_df[storage_records_df["is_charging"]][
         "flow_energy"
@@ -60,7 +62,7 @@ def create_charge_records_from_metering_data(
         "total_discharge_energy": total_discharge_energy,
         "total_energy": total_energy,
         "total_records": total_records,
-        "record_ids": [record.id for record in created_storage_records],
+        "record_ids": [record.id for record in created_storage_records_cast],
         "message": "Storage records created successfully.",
     }
 
@@ -70,7 +72,7 @@ def create_allocated_storage_records_from_submitted_data(
     write_session: Session = Depends(db.get_write_session),
     read_session: Session = Depends(db.get_read_session),
     esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
-) -> list[SQLModel] | None:
+) -> list[AllocatedStorageRecord] | None:
     """Storage Validator Only: Create a list of Allocated Storage Records from the specified submitted data.
 
     Relies on there being existing validated Storage Charge/Discharge Records for the specified device that include
@@ -177,7 +179,11 @@ def create_allocated_storage_records_from_submitted_data(
         esdb_client,
     )
 
-    return allocated_storage_records
+    allocated_storage_records_cast = cast(
+        list[AllocatedStorageRecord], allocated_storage_records
+    )
+
+    return allocated_storage_records_cast
 
 
 def get_max_certificate_id_by_device_id(

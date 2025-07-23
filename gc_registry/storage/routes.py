@@ -1,6 +1,7 @@
 import datetime
 import io
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 from esdbclient import EventStoreDBClient
@@ -209,7 +210,7 @@ async def get_storage_records_by_id_route(
         )
 
     # Check that the user has access to the devices associated with the storage records
-    device_ids = set(record.device_id for record in storage_records)
+    device_ids = {record.device_id for record in storage_records}
 
     validate_access_to_devices(device_ids, current_user, read_session)
 
@@ -274,15 +275,19 @@ async def create_storage_allocation(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    if not allocated_storage_records:
+    if allocated_storage_records is None:
         raise HTTPException(
             status_code=400,
             detail="No valid allocated storage records were created from the submitted data.",
         )
 
+    allocated_storage_records_cast = cast(
+        list[AllocatedStorageRecord], allocated_storage_records
+    )
+
     return AllocatedStorageRecordSubmissionResponse(
-        total_records=len(allocated_storage_records),
-        record_ids=[record.id for record in allocated_storage_records],
+        total_records=len(allocated_storage_records_cast),
+        record_ids=[record.id for record in allocated_storage_records_cast],
         message="Allocation records created successfully.",
     )
 
@@ -385,7 +390,7 @@ def get_allocated_storage_records_by_id_route(
         )
 
     # Check that the user has access to the devices associated with the allocated storage records
-    device_ids = set(record.device_id for record in allocated_storage_records)
+    device_ids = {record.device_id for record in allocated_storage_records}
 
     validate_access_to_devices(device_ids, current_user, read_session)
 
