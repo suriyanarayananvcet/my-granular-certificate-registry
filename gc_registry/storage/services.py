@@ -328,13 +328,15 @@ def issue_sdgcs_against_allocated_records(
     if not issued_sdgcs:
         raise ValueError("No SDGCs were created. Please check the input data.")
 
+    issued_sdgcs_cast = cast(list[GranularCertificateBundle], issued_sdgcs)
+
     # Update the allocation records with the SDGC IDs
     for allocated_storage_record in allocated_storage_records:
         sdgc_id = next(
             (
                 sdgc.id
-                for sdgc in issued_sdgcs
-                if sdgc["allocated_storage_record_id"] == allocated_storage_record.id
+                for sdgc in issued_sdgcs_cast
+                if sdgc.allocated_storage_record_id == allocated_storage_record.id
             ),
             None,
         )
