@@ -225,17 +225,6 @@ def issue_sdgcs_against_allocated_records(
 ) -> list[SQLModel]:
     """Issue SDGCs against the specified allocated storage records."""
 
-    allocated_storage_record_ids = [record.id for record in allocated_storage_records]
-
-    # Assert that all of the record IDs provided are valid
-    if len(allocated_storage_records) != len(allocated_storage_record_ids):
-        missing_record_ids = set(allocated_storage_record_ids) - {
-            record.id for record in allocated_storage_records
-        }
-        raise ValueError(
-            f"One or more specified allocated storage record IDs do not exist: {missing_record_ids}"
-        )
-
     # Check that all the allocated storage records have associated GC Bundles
     if not all(record.gc_allocation_id for record in allocated_storage_records):
         raise ValueError(
