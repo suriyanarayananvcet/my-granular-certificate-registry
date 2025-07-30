@@ -35,7 +35,7 @@ class DeviceBase(utils.ActiveRecord):
     operational_date: datetime.datetime = Field(
         description="The date that the device became operational.",
     )
-    capacity: float = Field(
+    power_mw: float = Field(
         description="The maximum power output of the device in MW.",
         ge=0,
     )
@@ -48,17 +48,19 @@ class DeviceBase(utils.ActiveRecord):
         min_length=1,
         max_length=255,
     )
-    duration: float | None = Field(
+    energy_mwh: float | None = Field(
         default=None,
-        description="""(Storage device only) The duration of the device in hours, such that
-                        the total energy capacity is equal to the capacity multiplied by the duration.""",
+        description="""If relevant, the total energy capacity of the device in MWh.
+                       For storage devices, this is the product of power_mw
+                       and the duration of the device in hours.""",
         ge=0,
     )
+    is_storage: bool = Field(
+        description="Whether the device is a storage device.",
+    )
 
-    @field_validator("duration")
-    def validate_duration(cls, v):
+    @field_validator("energy_mwh")
+    def validate_energy_mwh(cls, v):
         if cls.is_storage and v is None:
-            raise ValueError("Duration is required for storage devices")
-        if not cls.is_storage and v is not None:
-            raise ValueError("Duration is not allowed for non-storage devices")
+            raise ValueError("Energy capacity is required for battery storage devices")
         return v
