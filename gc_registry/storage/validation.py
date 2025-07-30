@@ -247,7 +247,7 @@ def validate_access_to_devices(
             user_devices.extend(account_devices)
 
         user_device_ids = {device.id for device in user_devices}
-        if not any(device_id in user_device_ids for device_id in device_ids):
+        if any(device_id not in user_device_ids for device_id in device_ids):
             invalid_devices = device_ids - user_device_ids
             raise PermissionError(
                 f"User does not have permission to access devices with IDs {invalid_devices}."
