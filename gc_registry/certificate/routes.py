@@ -170,7 +170,7 @@ async def import_certificate_bundle(
         "energy_source": "solar_pv",
         "technology_type": "photovoltaic",
         "operational_date": "2020-01-01",
-        "capacity": 50.0,
+        "power_mw": 50.0,
         "location": "Texas, USA",
         "is_storage": False
     }
