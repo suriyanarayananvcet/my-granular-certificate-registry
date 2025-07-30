@@ -9,7 +9,7 @@ def test_get_device_capacity_by_id(read_session, fake_db_wind_device) -> None:
     device_capacity = get_device_capacity_by_id(read_session, fake_db_wind_device.id)
 
     assert device_capacity is not None
-    assert round(device_capacity, 1) == round(fake_db_wind_device.capacity, 1)
+    assert round(device_capacity, 1) == round(fake_db_wind_device.power_mw, 1)
 
 
 def test_get_all_devices(

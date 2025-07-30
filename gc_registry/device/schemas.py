@@ -1,6 +1,6 @@
 import datetime
 
-from pydantic import field_validator
+from pydantic import model_validator
 from sqlmodel import Field
 
 from gc_registry import utils
@@ -56,11 +56,12 @@ class DeviceBase(utils.ActiveRecord):
         ge=0,
     )
     is_storage: bool = Field(
+        default=False,
         description="Whether the device is a storage device.",
     )
 
-    @field_validator("energy_mwh")
-    def validate_energy_mwh(cls, v):
-        if cls.is_storage and v is None:
+    @model_validator(mode="after")
+    def validate_energy_mwh(self):
+        if (self.is_storage is True) and (self.energy_mwh is None):
             raise ValueError("Energy capacity is required for battery storage devices")
-        return v
+        return self

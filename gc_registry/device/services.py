@@ -85,6 +85,8 @@ def map_device_to_certificate_read(device: Device) -> dict:
     device_dict_original = device_dict.copy()
 
     device_dict = {f"device_{k}": device_dict[k] for k in mapped_columns}
+    device_dict["device_capacity"] = device_dict["device_power_mw"]
+    del device_dict["device_power_mw"]
 
     not_mapped_columns = [
         k for k in device_dict_original.keys() if k not in mapped_columns
