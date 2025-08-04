@@ -299,6 +299,58 @@ def query_certificate_bundles_route(
     return certificate_query
 
 
+@router.get("/query_full", response_model=list[GranularCertificateBundleReadFull])
+def query_certificate_bundles_full_route(
+    certificate_bundle_query: GranularCertificateQuery,
+    current_user: User = Depends(get_current_user),
+    read_session: Session = Depends(db.get_read_session),
+):
+    """Return all certificates from the specified Account that match the provided search criteria,
+    including the full view of the certificate bundle, issuance metadata, and device."""
+
+    validate_user_role(current_user, required_role=UserRoles.AUDIT_USER)
+    validate_user_access(current_user, certificate_bundle_query.source_id, read_session)
+
+    certificate_bundles_from_query = services.query_certificate_bundles(
+        certificate_bundle_query, read_session
+    )
+
+    # Get unique metadata and device IDs
+    metadata_ids = set(
+        certificate.metadata_id for certificate in certificate_bundles_from_query
+    )
+    device_ids = set(
+        certificate.device_id for certificate in certificate_bundles_from_query
+    )
+
+    issuance_metadata_dicts = {}
+    device_dicts = {}
+
+    for metadata_id in metadata_ids:
+        issuance_metadata = IssuanceMetaData.by_id(metadata_id, read_session)
+        if not issuance_metadata:
+            raise HTTPException(
+                status_code=404,
+                detail="Issuance metadata not found for certificate bundle",
+            )
+        issuance_metadata_dicts[metadata_id] = issuance_metadata.model_dump()
+
+    for device_id in device_ids:
+        device = Device.by_id(device_id, read_session)
+        device_dicts[device_id] = map_device_to_certificate_read(device)
+
+    certificate_bundle_fulls = []
+    for certificate in certificate_bundles_from_query:
+        certificate_bundle_full = (
+            certificate.model_dump()
+            | issuance_metadata_dicts[certificate.metadata_id]
+            | device_dicts[certificate.device_id]
+        )
+        certificate_bundle_fulls.append(certificate_bundle_full)
+
+    return certificate_bundle_fulls
+
+
 @router.get("/{id}", response_model=GranularCertificateBundleReadFull)
 def read_certificate_bundle(
     id: int,
