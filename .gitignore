@@ -169,4 +169,3 @@ cache_all_tariffs.pkl
 .aws/config
 .aws/credentials
 node_modules
-frontend/package-lock.json
