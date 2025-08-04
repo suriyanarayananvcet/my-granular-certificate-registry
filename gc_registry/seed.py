@@ -117,16 +117,22 @@ def seed_data():
 
     device_capacities = client.get_device_capacities(bmu_ids)
 
-    # Create an inital Admin user
-    admin_user_dict = {
-        "email": "admin_user@usermail.com",
-        "name": "Admin",
-        "hashed_password": get_password_hash("admin"),
-        "role": UserRoles.ADMIN,
-    }
-    admin_user = User.create(admin_user_dict, write_session, read_session, esdb_client)[
-        0
-    ]
+    # Check if the admin user already exists
+    admin_user = read_session.exec(
+        select(User).where(User.email == "admin_user@usermail.com")
+    ).first()
+    if admin_user:
+        logger.info("Admin user already exists, skipping user creation...")
+    else:
+        admin_user_dict = {
+            "email": "admin_user@usermail.com",
+            "name": "Admin",
+            "hashed_password": get_password_hash("admin"),
+            "role": UserRoles.ADMIN,
+        }
+        admin_user = User.create(
+            admin_user_dict, write_session, read_session, esdb_client
+        )[0]
 
     production_user_dict = {
         "email": "production_user@usermail.com",
