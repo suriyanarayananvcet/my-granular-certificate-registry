@@ -319,13 +319,16 @@ def query_certificate_bundles_full_route(
         certificate_bundle_query, read_session
     )
 
+    if not certificate_bundles_from_query:
+        return []
+
     # Get unique metadata and device IDs
-    metadata_ids = set(
+    metadata_ids = {
         certificate.metadata_id for certificate in certificate_bundles_from_query
-    )
-    device_ids = set(
+    }
+    device_ids = {
         certificate.device_id for certificate in certificate_bundles_from_query
-    )
+    }
 
     issuance_metadata_dicts = {}
     device_dicts = {}
