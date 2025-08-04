@@ -350,6 +350,7 @@ def query_certificate_bundles_full_route(
             | issuance_metadata_dicts[certificate.metadata_id]
             | device_dicts[certificate.device_id]
         )
+        certificate_bundle_full["id"] = certificate.id
         certificate_bundle_fulls.append(certificate_bundle_full)
 
     return certificate_bundle_fulls
@@ -392,6 +393,7 @@ def read_certificate_bundle(
     certificate_bundle_full = (
         certificate_bundle.model_dump() | issuance_metadata.model_dump() | device_dict
     )
+    certificate_bundle_full["id"] = certificate_bundle.id
 
     return certificate_bundle_full
 

@@ -219,6 +219,10 @@ class GranularCertificateBundleReadFull(BaseModel):
     the queue.
     """
 
+    id: int = Field(
+        description="A unique ID assigned to this GC Bundle.",
+    )
+
     ### Mutable Attributes ###
     certificate_bundle_status: CertificateStatus = Field(
         description="""One of: Active, Cancelled, Claimed, Expired, Withdrawn, Locked, Reserved."""

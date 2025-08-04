@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import dayjs from "dayjs";
 import Cookies from "js-cookie";
 
@@ -26,10 +26,6 @@ import {
   downloadCertificates,
   downloadSelectedCertificate,
 } from "../../store/certificate/certificateThunk";
-import {
-  downloadCertificatesAPI,
-  downloadSelectedCertificateAPI,
-} from "../../api/certificateAPI";
 
 import CertificateActionDialog from "./CertificateActionDialog";
 import CertificateDetailDialog from "./CertificateDetailDialog";
@@ -88,35 +84,13 @@ const Certificate = () => {
     currentAccount?.detail?.certificateDevices,
   ]);
 
-  // get max bundle period start from the certificates
-  const maxBundlePeriodStart = useMemo(() => {
-    return certificates.reduce((max, certificate) => {
-      const certificatePeriodStart = dayjs(
-        certificate.production_starting_interval
-      );
-      return certificatePeriodStart.isAfter(max) ? certificatePeriodStart : max;
-    }, dayjs().subtract(30, "days"));
-  }, [certificates]);
-
-  const one_month_ago = maxBundlePeriodStart.subtract(30, "days");
-
   const defaultFilters = {
     device_id: null,
     energy_source: null,
     certificate_bundle_status: CERTIFICATE_STATUS.active,
-    certificate_period_start: dayjs(one_month_ago),
-    certificate_period_end: dayjs(maxBundlePeriodStart),
   };
 
   const [filters, setFilters] = useState(defaultFilters);
-
-  useEffect(() => {
-    setFilters((prevFilters) => ({
-      ...prevFilters,
-      certificate_period_start: one_month_ago,
-      certificate_period_end: maxBundlePeriodStart,
-    }));
-  }, []);
 
   useEffect(() => {
     if (!dialogAction) return;
@@ -156,18 +130,32 @@ const Certificate = () => {
   }, [selectedRecords]);
 
   const fetchCertificatesData = async () => {
+
     const fetchBody = {
       user_id: userInfo.userID,
       source_id: currentAccount?.detail.id,
-      device_id: filters.device_id,
-      certificate_bundle_status:
-        CERTIFICATE_STATUS[filters.certificate_bundle_status],
-      certificate_period_start:
-        filters.certificate_period_start?.format("YYYY-MM-DD"),
-      certificate_period_end:
-        filters.certificate_period_end?.format("YYYY-MM-DD"),
-      energy_source: filters.energy_source,
     };
+    
+    if (filters.device_id !== undefined && filters.device_id !== null) {
+      fetchBody.device_id = filters.device_id;
+    }
+    
+    if (filters.certificate_bundle_status !== undefined && filters.certificate_bundle_status !== null) {
+      fetchBody.certificate_bundle_status = CERTIFICATE_STATUS[filters.certificate_bundle_status];
+    }
+    
+    if (filters.certificate_period_start !== undefined && filters.certificate_period_start !== null) {
+      fetchBody.certificate_period_start = filters.certificate_period_start.format("YYYY-MM-DD");
+    }
+    
+    if (filters.certificate_period_end !== undefined && filters.certificate_period_end !== null) {
+      fetchBody.certificate_period_end = filters.certificate_period_end.format("YYYY-MM-DD");
+    }
+    
+    if (filters.energy_source !== undefined && filters.energy_source !== null) {
+      fetchBody.energy_source = filters.energy_source;
+    }
+    
     try {
       await dispatch(fetchCertificates(fetchBody)).unwrap();
     } catch (error) {
@@ -220,8 +208,13 @@ const Certificate = () => {
   };
 
   const onSelectChange = (newSelectedRowKeys, newSelectedRows) => {
+    // Always use the full dataset to find selected records, never trust newSelectedRows
+    const fullSelectedRecords = sortedCertificates.filter(cert => 
+      newSelectedRowKeys.includes(cert.id)
+    );
+    
+    setSelectedRecords(fullSelectedRecords);
     setSelectedRowKeys(newSelectedRowKeys);
-    setSelectedRecords(newSelectedRows);
   };
 
   const openDialog = (action) => {
@@ -256,18 +249,32 @@ const Certificate = () => {
       } else {
         message.loading("Fetching certificate bundles...", 0);
         
+        // Only include filter properties that have actual values (not undefined or null)
         const fetchBody = {
           user_id: userInfo.userID,
           source_id: currentAccount?.detail.id,
-          device_id: filters.device_id,
-          certificate_bundle_status:
-            CERTIFICATE_STATUS[filters.certificate_bundle_status],
-          certificate_period_start:
-            filters.certificate_period_start?.format("YYYY-MM-DD"),
-          certificate_period_end:
-            filters.certificate_period_end?.format("YYYY-MM-DD"),
-          energy_source: filters.energy_source,
         };
+        
+        // Only add filter properties if they have values
+        if (filters.device_id !== undefined && filters.device_id !== null) {
+          fetchBody.device_id = filters.device_id;
+        }
+        
+        if (filters.certificate_bundle_status !== undefined && filters.certificate_bundle_status !== null) {
+          fetchBody.certificate_bundle_status = CERTIFICATE_STATUS[filters.certificate_bundle_status];
+        }
+        
+        if (filters.certificate_period_start !== undefined && filters.certificate_period_start !== null) {
+          fetchBody.certificate_period_start = filters.certificate_period_start.format("YYYY-MM-DD");
+        }
+        
+        if (filters.certificate_period_end !== undefined && filters.certificate_period_end !== null) {
+          fetchBody.certificate_period_end = filters.certificate_period_end.format("YYYY-MM-DD");
+        }
+        
+        if (filters.energy_source !== undefined && filters.energy_source !== null) {
+          fetchBody.energy_source = filters.energy_source;
+        }
         
         const response = await dispatch(downloadCertificates(fetchBody)).unwrap();
 
@@ -282,6 +289,11 @@ const Certificate = () => {
     }
   };
 
+  // Create a stable reference to the handler
+  const downloadHandler = useCallback(() => {
+    handleDownloadCertificates();
+  }, [selectedRecords, selectedRowKeys]);
+
   const btnList = useMemo(
     () => [
       {
@@ -291,7 +303,7 @@ const Certificate = () => {
         disabled: false,
         style: { height: "40px", marginRight: "16px" },
         name: selectedRowKeys.length > 0 ? "Download Selected" : "Download All",
-        handle: handleDownloadCertificates,
+        handle: downloadHandler,
       },
       {
         icon: <UploadOutlined />,
@@ -330,7 +342,7 @@ const Certificate = () => {
         handle: () => openDialog("transfer"),
       },
     ],
-    [isCertificatesSelected]
+    [selectedRowKeys.length, downloadHandler, isCertificatesSelected]
   );
 
   const filterComponents = [
@@ -364,8 +376,9 @@ const Certificate = () => {
     <RangePicker
       value={[filters.certificate_period_start, filters.certificate_period_end]}
       onChange={(dates) => handleDateChange(dates)}
-      allowClear={false}
+      allowClear={true} // Change to true to allow clearing
       format="YYYY-MM-DD"
+      placeholder={["Start Date", "End Date"]} // Add placeholder text
     />,
     <Select
       // mode="multiple"
@@ -511,6 +524,8 @@ const Certificate = () => {
         onRowsSelected={onSelectChange}
         handleApplyFilter={handleApplyFilter}
         handleClearFilter={handleClearFilter}
+        selectedRowKeys={selectedRowKeys}
+        selectedRecords={selectedRecords}
       />
 
       {/* Dialog component with a ref to control it from outside */}

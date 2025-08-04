@@ -75,13 +75,15 @@ export const isEqual = (obj1, obj2) => {
 export const downloadCertificatesAsCSV = (certificates, filename = "certificate_bundles_export.csv") => {
   // Define headers based on GranularCertificateBundleReadFull schema
   const headers = [
+
+    "ID",
+  
     // Mutable Attributes
     "Certificate Bundle Status",
     "Account ID", 
     "Certificate Bundle ID Range Start",
     "Certificate Bundle ID Range End",
     "Bundle Quantity (Wh)",
-    "Production (MWh)",
     
     // Bundle Characteristics
     "Issuance ID",
@@ -97,7 +99,7 @@ export const downloadCertificatesAsCSV = (certificates, filename = "certificate_
     "Device Name",
     "Device Technology Type",
     "Device Production Start Date",
-    "Device Capacity (W)",
+    "Device Capacity (MW)",
     "Device Location",
     
     // Temporal Characteristics
@@ -139,13 +141,15 @@ export const downloadCertificatesAsCSV = (certificates, filename = "certificate_
   // Convert certificate data to CSV rows
   const csvRows = certificates.map(cert => {
     return [
+
+      cert.id || "",
+
       // Mutable Attributes
       cert.certificate_bundle_status || "",
       cert.account_id || "",
-      cert.certificate_bundle_id_range_start || "",
+      cert.certificate_bundle_id_range_start || "0",
       cert.certificate_bundle_id_range_end || "",
       cert.bundle_quantity || "",
-      cert.bundle_quantity ? (cert.bundle_quantity / 1e6).toFixed(3) : "",
       
       // Bundle Characteristics
       cert.issuance_id || "",
