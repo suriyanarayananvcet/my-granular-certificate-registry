@@ -32,9 +32,7 @@ export const importCertificatesAPI = (formData) => {
 };
 
 export const downloadCertificatesAPI = (queryData) => {
-  return baseAPI.get("/certificate/query_full", {
-    params: queryData,
-  });
+  return baseAPI.post("/certificate/query_full", queryData);
 };
 
 export const downloadSelectedCertificateAPI = (certificateId) => {

@@ -282,7 +282,11 @@ class GranularCertificateBundleReadFull(BaseModel):
         description="The date on which the production Device began generating energy.",
     )
     device_capacity: int = Field(
-        description="The maximum capacity of the production Device in Watts (W).",
+        description="The maximum capacity of the production Device in Megawatts (MW).",
+    )
+    device_energy_mwh: int = Field(
+        default=0,
+        description="The energy storage capacity of the production Device in MegawattHours (MWh).",
     )
     device_location: str = Field(
         description="The GPS coordinates of the production or Storage Device responsible for releasing the energy represented by the GC Bundle.",

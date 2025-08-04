@@ -299,7 +299,11 @@ def query_certificate_bundles_route(
     return certificate_query
 
 
-@router.get("/query_full", response_model=list[GranularCertificateBundleReadFull])
+@router.post(
+    "/query_full",
+    response_model=list[GranularCertificateBundleReadFull],
+    status_code=202,
+)
 def query_certificate_bundles_full_route(
     certificate_bundle_query: GranularCertificateQuery,
     current_user: User = Depends(get_current_user),

@@ -23,6 +23,8 @@ import { useAccount } from "../../context/AccountContext";
 import {
   fetchCertificates,
   getCertificateDetails,
+  downloadCertificates,
+  downloadSelectedCertificate,
 } from "../../store/certificate/certificateThunk";
 import {
   downloadCertificatesAPI,
@@ -236,8 +238,61 @@ const Certificate = () => {
 
   const isCertificatesSelected = selectedRowKeys.length > 0;
 
+  const handleDownloadCertificates = async () => {
+    try {
+      if (selectedRecords.length > 0) {
+        // Download selected certificates using the actual certificate IDs
+        message.loading("Fetching selected certificates...", 0);
+        
+        const certificatePromises = selectedRecords.map(certificate => 
+          dispatch(downloadSelectedCertificate(certificate.id)).unwrap()
+        );
+        
+        const certificatesData = await Promise.all(certificatePromises);
+        
+        message.destroy();
+        downloadCertificatesAsCSV(certificatesData, "gc_bundles_download_selected.csv");
+        message.success("Selected certificate bundles downloaded successfully");
+      } else {
+        message.loading("Fetching certificate bundles...", 0);
+        
+        const fetchBody = {
+          user_id: userInfo.userID,
+          source_id: currentAccount?.detail.id,
+          device_id: filters.device_id,
+          certificate_bundle_status:
+            CERTIFICATE_STATUS[filters.certificate_bundle_status],
+          certificate_period_start:
+            filters.certificate_period_start?.format("YYYY-MM-DD"),
+          certificate_period_end:
+            filters.certificate_period_end?.format("YYYY-MM-DD"),
+          energy_source: filters.energy_source,
+        };
+        
+        const response = await dispatch(downloadCertificates(fetchBody)).unwrap();
+
+        message.destroy();
+        downloadCertificatesAsCSV(response, "gc_bundles_download_full.csv");
+        message.success(`${response.length} Certificate bundles downloaded successfully`);
+      }
+    } catch (error) {
+      message.destroy(); // Clear loading message
+      console.error("Download error:", error);
+      message.error("Failed to download certificate bundles");
+    }
+  };
+
   const btnList = useMemo(
     () => [
+      {
+        icon: <DownloadOutlined />,
+        btnType: "primary",
+        type: "download",
+        disabled: false,
+        style: { height: "40px", marginRight: "16px" },
+        name: selectedRowKeys.length > 0 ? "Download Selected" : "Download All",
+        handle: handleDownloadCertificates,
+      },
       {
         icon: <UploadOutlined />,
         btnType: "primary",
@@ -246,15 +301,6 @@ const Certificate = () => {
         style: { height: "40px", marginRight: "16px" },
         name: "Import",
         handle: () => openImportDialog(),
-      },
-      {
-        icon: <DownloadOutlined />,
-        btnType: "default",
-        type: "download",
-        disabled: false,
-        style: { height: "40px", marginRight: "16px" },
-        name: selectedRowKeys.length > 0 ? "Download Selected" : "Download All",
-        handle: handleDownloadCertificates,
       },
       {
         icon: <CloseOutlined />,
@@ -286,51 +332,6 @@ const Certificate = () => {
     ],
     [isCertificatesSelected]
   );
-
-const handleDownloadCertificates = async () => {
-  try {
-    if (selectedRecords.length > 0) {
-      // Download selected certificates using the actual certificate IDs
-      message.loading("Fetching selected certificates...", 0);
-      
-      const certificatePromises = selectedRecords.map(certificate => 
-        downloadSelectedCertificateAPI(certificate.id)
-      );
-      
-      const responses = await Promise.all(certificatePromises);
-      const certificatesData = responses.map(response => response.data);
-      
-      message.destroy();
-      downloadCertificatesAsCSV(certificatesData, "gc_bundles_download_selected.csv");
-      message.success("Selected certificate bundles downloaded successfully");
-    } else {
-      message.loading("Fetching certificate bundles...", 0);
-      
-      const fetchBody = {
-        user_id: userInfo.userID,
-        source_id: currentAccount?.detail.id,
-        device_id: filters.device_id,
-        certificate_bundle_status:
-          CERTIFICATE_STATUS[filters.certificate_bundle_status],
-        certificate_period_start:
-          filters.certificate_period_start?.format("YYYY-MM-DD"),
-        certificate_period_end:
-          filters.certificate_period_end?.format("YYYY-MM-DD"),
-        energy_source: filters.energy_source,
-      };
-      
-      const response = await downloadCertificatesAPI(fetchBody);
-      
-      message.destroy();
-      downloadCertificatesAsCSV(response.data, "gc_bundles_download_full.csv");
-      message.success("Certificate bundles downloaded successfully");
-    }
-  } catch (error) {
-    message.destroy(); // Clear loading message
-    console.error("Download error:", error);
-    message.error("Failed to download certificate bundles");
-  }
-};
 
   const filterComponents = [
     /* Device Filter */
