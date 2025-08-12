@@ -99,7 +99,8 @@ export const downloadCertificatesAsCSV = (certificates, filename = "certificate_
     "Device Name",
     "Device Technology Type",
     "Device Production Start Date",
-    "Device Capacity (MW)",
+    "Device Power (MW)",
+    "Device Energy (MWh)",
     "Device Location",
     
     // Temporal Characteristics
@@ -128,7 +129,6 @@ export const downloadCertificatesAsCSV = (certificates, filename = "certificate_
     // Other Optional Characteristics
     "Emissions Factor Production Device",
     "Emissions Factor Source",
-    "Is Deleted"
   ];
   
   if (!certificates || certificates.length === 0) {
@@ -165,7 +165,8 @@ export const downloadCertificatesAsCSV = (certificates, filename = "certificate_
       cert.device_name || "",
       cert.device_technology_type || "",
       cert.device_production_start_date || "",
-      cert.device_capacity || "",
+      cert.device_power_mw || "",
+      cert.device_energy_mwh || "",
       cert.device_location || "",
       
       // Temporal Characteristics
@@ -194,7 +195,7 @@ export const downloadCertificatesAsCSV = (certificates, filename = "certificate_
       // Other Optional Characteristics
       cert.emissions_factor_production_device || "",
       cert.emissions_factor_source || "",
-      cert.is_deleted || ""
+
     ].map(field => `"${String(field).replace(/"/g, '""')}"`); // Escape quotes and wrap in quotes
   });
 

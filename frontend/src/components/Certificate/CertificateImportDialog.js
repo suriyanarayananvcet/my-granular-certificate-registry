@@ -77,7 +77,8 @@ const CertificateImportDialog = forwardRef((props, ref) => {
         energy_source: formValues.energy_source,
         technology_type: formValues.technology_type,
         operational_date: formValues.operational_date,
-        capacity: parseFloat(formValues.capacity),
+        power_mw: parseFloat(formValues.power_mw),
+        energy_mwh: parseFloat(formValues.energy_mwh),
         location: formValues.location,
         is_storage: formValues.is_storage || false,
         peak_demand: parseFloat(formValues.peak_demand),
@@ -278,9 +279,39 @@ const CertificateImportDialog = forwardRef((props, ref) => {
               </Form.Item>
 
               <Form.Item
-                name="capacity"
-                label="Capacity (MW)"
-                rules={[{ required: true, message: "Please enter capacity" }]}
+                name="power_mw"
+                label="Device Power (MW)"
+                initialValue={0}
+                rules={[
+                  {
+                    required: true,
+                    message: "Please enter maximum device power, if applicable"
+                  },
+                  {
+                    type: "number",
+                    min: 0,
+                    message: "Device power cannot be negative"
+                  }
+                ]}
+              >
+                <Input type="number" placeholder="e.g., 50.0" />
+              </Form.Item>
+
+              <Form.Item
+                name="energy_mwh"
+                label="Device Energy (MWh)"
+                initialValue={0}
+                rules={[
+                  {
+                    required: false,
+                    message: "Please enter device energy storage capacity, if applicable"
+                  },
+                  {
+                    type: "number",
+                    min: 0,
+                    message: "Device energy storage capacity cannot be negative"
+                  }
+                ]}
               >
                 <Input type="number" placeholder="e.g., 50.0" />
               </Form.Item>
@@ -296,7 +327,18 @@ const CertificateImportDialog = forwardRef((props, ref) => {
               <Form.Item
                 name="peak_demand"
                 label="Peak Demand (MW)"
-                rules={[{ required: true, message: "Please enter peak demand" }]}
+                initialValue={0}
+                rules={[
+                  {
+                    required: false,
+                    message: "Please enter peak demand, if applicable"
+                  },
+                  {
+                    type: "number",
+                    min: 0,
+                    message: "Peak demand cannot be negative"
+                  }
+                ]}
               >
                 <Input type="number" placeholder="e.g., 50.0" />
               </Form.Item>
