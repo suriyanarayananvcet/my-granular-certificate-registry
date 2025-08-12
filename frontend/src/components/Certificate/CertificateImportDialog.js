@@ -1,5 +1,5 @@
 import React, { useState, forwardRef, useImperativeHandle } from "react";
-import { Modal, Button, Space, Typography, Upload, message, Form, Input, Select } from "antd";
+import { Modal, Button, Space, Typography, Upload, message, Form, Input, Select, InputNumber } from "antd";
 import {
   DownloadOutlined,
   UploadOutlined,
@@ -294,7 +294,7 @@ const CertificateImportDialog = forwardRef((props, ref) => {
                   }
                 ]}
               >
-                <Input type="number" placeholder="e.g., 50.0" />
+                <InputNumber style={{ width: '100%' }} placeholder="e.g., 50.0" min={0} />
               </Form.Item>
 
               <Form.Item
@@ -313,7 +313,7 @@ const CertificateImportDialog = forwardRef((props, ref) => {
                   }
                 ]}
               >
-                <Input type="number" placeholder="e.g., 50.0" />
+                <InputNumber style={{ width: '100%' }} placeholder="e.g., 50.0" min={0} />
               </Form.Item>
 
               <Form.Item
@@ -340,7 +340,7 @@ const CertificateImportDialog = forwardRef((props, ref) => {
                   }
                 ]}
               >
-                <Input type="number" placeholder="e.g., 50.0" />
+                <InputNumber style={{ width: '100%' }} placeholder="e.g., 50.0" min={0} />
               </Form.Item>
             </Form>
           )}
