@@ -33,7 +33,10 @@ def get_certificate_devices_by_account_id(
     stmt: SelectOfScalar = (
         select(Device)
         .join(GranularCertificateBundle)
-        .where(GranularCertificateBundle.account_id == account_id)
+        .where(
+            GranularCertificateBundle.device_id == Device.id,
+            GranularCertificateBundle.account_id == account_id,
+        )
         .distinct()
     )
     devices = db_session.exec(stmt).all()
