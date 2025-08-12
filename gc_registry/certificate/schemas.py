@@ -285,10 +285,10 @@ class GranularCertificateBundleReadFull(BaseModel):
     device_production_start_date: datetime.datetime = Field(
         description="The date on which the production Device began generating energy.",
     )
-    device_power_mw: int = Field(
+    device_power_mw: float = Field(
         description="The maximum capacity of the production Device in Megawatts (MW).",
     )
-    device_energy_mwh: int = Field(
+    device_energy_mwh: float | None = Field(
         default=0,
         description="The energy storage capacity of the production Device in MegawattHours (MWh).",
     )
