@@ -33,7 +33,10 @@ def get_certificate_devices_by_account_id(
     stmt: SelectOfScalar = (
         select(Device)
         .join(GranularCertificateBundle)
-        .where(GranularCertificateBundle.account_id == account_id)
+        .where(
+            GranularCertificateBundle.device_id == Device.id,
+            GranularCertificateBundle.account_id == account_id,
+        )
         .distinct()
     )
     devices = db_session.exec(stmt).all()
@@ -79,14 +82,12 @@ def device_mw_capacity_to_wh_max(
 
 
 def map_device_to_certificate_read(device: Device) -> dict:
-    mapped_columns = ["id", "technology_type", "power_mw", "location"]
+    mapped_columns = ["id", "technology_type", "power_mw", "location", "energy_mwh"]
 
     device_dict = device.model_dump().copy()
     device_dict_original = device_dict.copy()
 
     device_dict = {f"device_{k}": device_dict[k] for k in mapped_columns}
-    device_dict["device_capacity"] = device_dict["device_power_mw"]
-    del device_dict["device_power_mw"]
 
     not_mapped_columns = [
         k for k in device_dict_original.keys() if k not in mapped_columns
