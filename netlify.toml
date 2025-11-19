@@ -1,8 +1,8 @@
 [build]
   base = "frontend"
-  command = "npm run build"
+  command = "npm ci && npm run build"
   publish = "dist"
 
 [build.environment]
-  NODE_ENV = "production"
+  NPM_FLAGS = "--production=false"
   REACT_APP_API_URL = "https://granular-certificate-registry.onrender.com"
