@@ -237,6 +237,13 @@ app.include_router(
     prefix="/auth",
 )
 
+# Add seed endpoint
+from .seed_endpoint import router as seed_router
+app.include_router(
+    seed_router,
+    prefix="/admin",
+)
+
 openapi_data = app.openapi()
 
 templates = Jinja2Templates(directory=STATIC_DIR_FP / "templates")
