@@ -134,7 +134,7 @@ class CSRFMiddleware:
         request = Request(scope, receive=receive)
 
         # Check exempt paths first
-        if request.url.path in self.exempt_paths:
+        if request.url.path in self.exempt_paths or any(request.url.path.endswith(path) for path in self.exempt_paths):
             return await self.app(scope, receive, send)
 
         # Proper origin checking
