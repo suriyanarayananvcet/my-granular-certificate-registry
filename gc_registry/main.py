@@ -142,7 +142,8 @@ class CSRFMiddleware:
         if origin and origin in self.allow_origins:
             return await self.app(scope, receive, send)
 
-        if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+        # Temporarily disable CSRF for user creation
+        if request.method in ("POST", "PUT", "DELETE", "PATCH") and not request.url.path.startswith("/user/"):
             csrf_token = request.headers.get("X-CSRF-Token")
             session_token = request.session.get("csrf_token")
 
