@@ -124,7 +124,7 @@ class CSRFMiddleware:
         self.app = app
         self.allow_origins = set(allow_origins or [])
         self.exempt_paths = set(
-            exempt_paths or ["/csrf-token", "/docs", "/redoc", "/openapi.json", "/user/create_test_account"]
+            exempt_paths or ["/csrf-token", "/docs", "/redoc", "/openapi.json", "/user/create_test_account", "/user/create"]
         )
 
     async def __call__(self, scope, receive, send):
@@ -180,7 +180,7 @@ app.add_middleware(
 app.add_middleware(
     CSRFMiddleware,
     allow_origins=origins,
-    exempt_paths={"/csrf-token", "/docs", "/redoc", "/openapi.json", "/user/create_test_account"},
+    exempt_paths={"/csrf-token", "/docs", "/redoc", "/openapi.json", "/user/create_test_account", "/user/create"},
 )
 
 app.add_middleware(SessionMiddleware, secret_key=settings.MIDDLEWARE_SECRET_KEY)

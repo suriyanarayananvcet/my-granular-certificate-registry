@@ -23,6 +23,10 @@ def create_admin_user():
     os.environ['POSTGRES_USER'] = 'registry_user'
     os.environ['POSTGRES_PASSWORD'] = 'VQlBOdNhVGJhqLJhqvJhqvJhqvJhqvJh'
     os.environ['POSTGRES_DB'] = 'registry_db'
+    os.environ['ENVIRONMENT'] = 'PROD'
+    os.environ['ESDB_CONNECTION_STRING'] = 'esdb://localhost:2113?tls=false'
+    os.environ['JWT_SECRET_KEY'] = 'secret_key'
+    os.environ['MIDDLEWARE_SECRET_KEY'] = 'secret_key'
     
     try:
         # Get database connections
