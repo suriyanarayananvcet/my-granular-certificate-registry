@@ -178,11 +178,12 @@ app.add_middleware(
     expose_headers=["X-CSRF-Token"],
 )
 
-app.add_middleware(
-    CSRFMiddleware,
-    allow_origins=origins,
-    exempt_paths={"/csrf-token", "/docs", "/redoc", "/openapi.json", "/user/create_test_account", "/user/create"},
-)
+# Temporarily disable CSRF middleware
+# app.add_middleware(
+#     CSRFMiddleware,
+#     allow_origins=origins,
+#     exempt_paths={"/csrf-token", "/docs", "/redoc", "/openapi.json", "/user/create_test_account", "/user/create"},
+# )
 
 app.add_middleware(SessionMiddleware, secret_key=settings.MIDDLEWARE_SECRET_KEY)
 
