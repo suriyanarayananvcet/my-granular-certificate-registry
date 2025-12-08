@@ -58,6 +58,12 @@ def create_user(
     return user
 
 
+@router.get("/test-deployment")
+def test_deployment():
+    """Test endpoint to verify deployment"""
+    return {"status": "deployed", "version": "2024-12-08-v2"}
+
+
 @router.post("/register", response_model=UserRead)
 def register_user(
     user_base: UserCreate,
