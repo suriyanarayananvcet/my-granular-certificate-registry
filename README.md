@@ -1,86 +1,108 @@
-# FEA Granular Certificate Demonstration Registry
-An open-source platform to demonstrate the capabilities of a Granular Certificate registry that conforms to the EnergyTag Standards and API specification.
+# Granular Certificate Registry System
 
-### Operation
-The GC Registry is designed to be downloaded and operated locally either through a Docker container, or through manual package loading for development purposes.
-In addition, a persistent instance will be available on GCP for non-technical users to interact with the front end.
+A complete system that converts annual energy certificates into hourly certificates using real electricity generation data.
 
-Dependency management is handled through Poetry - on first use, run `poetry install` to initialise the required packages.
+## What This System Does
 
-To get started interfacing with the GC Registry container, follow these steps to get started, using your IDE and API messenger of choice:
-- Make sure you have the Docker daemon running, either through Docker desktop or the CLI.
-- Create a `.env` file in the root directory and populate it with the example values in the `.env.example` file provided. Make any configuration edits as required here. 
-- On first use, from the root directory run `docker compose -f compose.override.yml up --build` to build the image and run the container cluster. The cluster is composed of four containers:
-    - `gc_registry` - the FastAPI app and backend services for the registry
-    - `eventsotre` - an open-source streaming database that sequentially records registry events immutably
-    - `postgres_db_write` - a Postgres database container using the official image that receives write operations from the registry
-    - `postgres_db_read` - the parallel read Postgres instance that is written to simultaneously to the write instance, in order to optimise the concurrent processing of read operations without being detrimental to the performance of write operations.
-- By default, the container port mappings are: 
-    - The `gc_registry` FastAPI app - `8000`
-    - The `eventstore` instance GUI - `2113`
-    - The Postgres write intance - `5436`
-    - The Postgres read instance - `5438` 
-- Documentation comes in two flavours:
-    - `localhost:8000/docs` - Swagger-style schema and endpoint descriptions that allows basic interaction with API
-    - `localhost:8000/redoc` - alternative, non-interactive documentation from Redocly that is more human-readable than Swagger
-- This repository uses a [makefile](Makefile) for quick access to convenience functions that are common across both users and developers. For instance, `make dev` will quickly call Docker compose to load up the container cluster. 
-- On first build, the database containers will not contain the schemas for the entities. We have used `alembic` to manage the schema migrations and for ease of setting up - use `make db.update` to load in the most recent schema to the database.
-    - If during development you make any changes to the `sqlmodel` entity definitions, you can quickly reflect that change in the database by running `make db.revision "NAME={name_your_revision}"`, with a suitably descriptive name for the intended changes in place of `name_your_revision`.
-    - This will create a new migration file in `gc_registry/core/alembic/versions`, and we recommend double checking the contents of this auto-generated file before committing it to the database with `make db.update`.
-    - The database can be fully reset using `make db.reset`; this will clear all entities in both database instances and reset the schema to the most recent iteration.  
-- Initially, the database instances will contain no elements. To get started quickly, we recommend seeding the database with some example User, Account, Device, and GC Bundle entities courtesy of Elexon (the UK aggregator of electricity system data) with the command `make db.seed`.
+**Input:** Annual energy certificate (e.g., 1000 MWh for the whole year)
 
-### Interfacing with the Registry
+**Process:** Matches with hourly electricity generation data (8760 hours)
 
-Each entity has the four basic crud operation endpoints accessible through the lower case singular name of the entity as the router and the operation or ID as the suffix. For example, either through Postman to `localhost:8000` or through a notebook with `client = httpx.Client("localhost:8000)` 
-- `GET(account/1)` will return the account with ID 1, which in this case would be first account created on the registry as the integer ID primary keys are unique and serial across each entity.
-- Creating an entity is possible by passing jsons programmatically, or manually through the payload entry on Postman:
-    ```python
-    import json
-    account = {"account_name": "Example Account", "user_ids": [1], "account_whitelist": [1]}
-    client.post("account/create", data=json.dumps(account))
-    ```
-    This will create an account with the name `Example Account`, belonging to the user with ID `1`, and has whitelisted the account with ID `1` to receive GC Bundles from.
-- Querying certificates is done through the `certificates/query` POST endpoint, and allows for advanced requests to be expressed through the `CertificateQuery` object, the schema for which can be found in the docs.
-- To enforce a safe workflow whereby registry users do not unintentially apply certificate lifecycle actions such as `transfer` and `cancel` to bundles using blind queries, these actions only accept lists of certificate bundle IDs (not to be confused with the bundle _range_ IDs that identify the individual Wh within each bundle). This encourages users to first run a `query`, confirm that the GC Bundles returned are those that they wish to operate on, and then pass the bundle IDs to the mutation endpoint to perform the intended action on those GC bundles.
+**Output:** 8760 hourly certificates (one for each hour)
 
-### Validation and Constraints
+## Example
 
-The registry contains numerous validation steps to ensure that double counting risk is mitigated. Some additional mechanisms that have been included to mirror the operation of existing registries include:
-- Accounts can only transfer GC Bundles to another account if the target account has whitelisted the source account. This can be achieved through the `account/update_whitelist` endpoint.
+**Before:** 1 certificate = 1000 MWh (whole year)
 
+**After:**
+- Hour 1 = 0.5 MWh certificate
+- Hour 2 = 0.3 MWh certificate
+- Hour 3 = 0.7 MWh certificate
+- ...8760 hours total
 
-### Technology choices
+## Why This Matters
 
-The main technological choices for the application include:
+**Old way:** "I used 1000 MWh of renewable energy this year"
 
-- Language: [Python](https://www.python.org/)
-- Framework: [FastAPI](https://fastapi.tiangolo.com/)
-- Database: [PostgreSQL](https://www.postgresql.org/) (Local instances)
-- Models/types: [Pydantic](https://docs.pydantic.dev/latest/) (As specified in the EnergyTag API specification code)
-- ORM: [SQLModel](https://sqlmodel.tiangolo.com/) (abstraction of [SQLAlchemy](https://www.sqlalchemy.org/))
-- Frontend: [React](https://react.dev/)/[Node.js](https://nodejs.org/en) with [Axios](https://axios-http.com/docs/intro) for HTTP requests to FastAPI backend
+**Your way:** "I used 0.5 MWh of renewable energy at 2pm on March 15th"
 
-Development tools:
+## Features
 
-- Dependency/Environment management: [Poetry](https://python-poetry.org/)
-- Database migrations: [Alembic](https://alembic.sqlalchemy.org/en/latest/)
-- Test runner: [Pytest](https://docs.pytest.org/en/8.0.x/)
-- Code linting/formatting: [Ruff](https://docs.astral.sh/ruff/)
-- CI/CD: [GitHub Actions](https://github.com/features/actions)
-- Versioning: [Python Semantic release](https://python-semantic-release.readthedocs.io/en/latest/)
-- Deployment: [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/)
+✅ Takes canceled yearly certificates  
+✅ Matches them with hourly electricity data  
+✅ Creates thousands of hourly certificates  
+✅ Validates everything is correct  
+✅ Manages certificate trading and tracking  
 
-## Further documentation
+## Installation
 
-| I want to know about...              |                                  |
-|--------------------------------------|----------------------------------|
-| [Development](docs/DEVELOPMENT.md)   | Linting, formatting, testing etc |
-| [Contributing](docs/CONTRIBUTING.md) | Our processes for contributors   |
-| [Change Log](docs/CHANGELOG.md)         | Log of code changes              |
+```bash
+pip install -r requirements.txt
+```
 
+## Quick Start
 
+```python
+from granular_certificate_registry import CertificateProcessor, AnnualCertificate
 
+# Create an annual certificate
+annual_cert = AnnualCertificate(
+    certificate_id="CERT-2024-001",
+    total_mwh=1000.0,
+    year=2024,
+    source_type="solar",
+    status="canceled"
+)
 
+# Load hourly generation data
+processor = CertificateProcessor()
+hourly_data = processor.load_hourly_data("hourly_generation_data.csv")
 
-# Trigger deployment
+# Convert to hourly certificates
+hourly_certificates = processor.convert_to_hourly(annual_cert, hourly_data)
+
+# Validate
+processor.validate_conversion(annual_cert, hourly_certificates)
+
+# Register certificates
+registry = CertificateRegistry()
+registry.register_certificates(hourly_certificates)
+```
+
+## Project Structure
+
+```
+granular_certificate_registry/
+├── __init__.py
+├── models.py              # Data models
+├── processor.py           # Certificate processing engine
+├── validator.py           # Validation system
+├── registry.py            # Certificate registry and tracking
+├── trading.py             # Trading system
+└── api.py                 # API interface
+
+examples/
+├── example_usage.py
+└── sample_data.csv
+
+tests/
+└── test_system.py
+```
+
+## API Usage
+
+Start the API server:
+```bash
+python -m granular_certificate_registry.api
+```
+
+Then use the API endpoints:
+- `POST /certificates/annual` - Register annual certificate
+- `POST /certificates/convert` - Convert annual to hourly
+- `GET /certificates/hourly/{certificate_id}` - Get hourly certificates
+- `POST /certificates/trade` - Trade certificates
+- `GET /certificates/validate/{certificate_id}` - Validate certificates
+
+## License
+
+MIT

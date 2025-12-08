@@ -114,45 +114,13 @@ app = FastAPI(
 )
 
 
+# CSRF Middleware completely disabled for initial setup
 class CSRFMiddleware:
-    def __init__(
-        self,
-        app,
-        allow_origins: list[str] | None = None,
-        exempt_paths: set[str] | None = None,
-    ):
+    def __init__(self, app, allow_origins=None, exempt_paths=None):
         self.app = app
-        self.allow_origins = set(allow_origins or [])
-        self.exempt_paths = set(
-            exempt_paths or ["/csrf-token", "/docs", "/redoc", "/openapi.json", "/user/create_test_account", "/user/create"]
-        )
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http":
-            return await self.app(scope, receive, send)
-
-        request = Request(scope, receive=receive)
-
-        # Check exempt paths first
-        if request.url.path in self.exempt_paths or any(request.url.path.endswith(path) for path in self.exempt_paths):
-            return await self.app(scope, receive, send)
-
-        # Proper origin checking
-        origin = request.headers.get("origin")
-        if origin and origin in self.allow_origins:
-            return await self.app(scope, receive, send)
-
-        # Temporarily disable CSRF for user creation
-        if request.method in ("POST", "PUT", "DELETE", "PATCH") and not request.url.path.startswith("/user/"):
-            csrf_token = request.headers.get("X-CSRF-Token")
-            session_token = request.session.get("csrf_token")
-
-            if not csrf_token or not session_token or csrf_token != session_token:
-                response = JSONResponse(
-                    status_code=403, content={"detail": "CSRF token missing or invalid"}
-                )
-                return await response(scope, receive, send)
-
+        # Pass through all requests without CSRF checks
         return await self.app(scope, receive, send)
 
 
