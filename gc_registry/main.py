@@ -114,16 +114,6 @@ app = FastAPI(
 )
 
 
-# CSRF Middleware completely disabled for initial setup
-class CSRFMiddleware:
-    def __init__(self, app, allow_origins=None, exempt_paths=None):
-        self.app = app
-
-    async def __call__(self, scope, receive, send):
-        # Pass through all requests without CSRF checks
-        return await self.app(scope, receive, send)
-
-
 origins = [
     "http://localhost:9000",
     "http://127.0.0.1:9000",
