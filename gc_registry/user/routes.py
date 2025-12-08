@@ -58,6 +58,31 @@ def create_user(
     return user
 
 
+@router.post("/register", response_model=UserRead)
+def register_user(
+    user_base: UserCreate,
+    write_session: Session = Depends(db.get_write_session),
+    read_session: Session = Depends(db.get_read_session),
+    esdb_client: EventStoreDBClient = Depends(events.get_esdb_client),
+):
+    """Public endpoint for user registration - no authentication required"""
+    user_base.hashed_password = get_password_hash(user_base.password)
+    user_base.role = UserRoles.PRODUCTION_USER  # Default role
+
+    existing_user = read_session.exec(
+        select(User).where(User.email == user_base.email)
+    ).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"User with email {user_base.email} already exists.",
+        )
+
+    user = User.create(user_base, write_session, read_session, esdb_client)
+
+    return user
+
+
 @router.get("/me", response_model=UserRead)
 def read_current_user(
     current_user: LoggedInUser, read_session: Session = Depends(db.get_read_session)
