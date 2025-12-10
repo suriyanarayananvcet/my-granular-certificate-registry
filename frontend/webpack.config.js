@@ -4,6 +4,7 @@ const TerserPlugin = require("terser-webpack-plugin");
 const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
 const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer");
 const ReactRefreshWebpackPlugin = require("@pmmmwh/react-refresh-webpack-plugin");
+const CopyWebpackPlugin = require("copy-webpack-plugin");
 
 const isDevelopment = process.env.NODE_ENV === "development";
 const webpack = require("webpack");
@@ -90,6 +91,11 @@ module.exports = {
         collapseWhitespace: true,
         removeComments: true,
       },
+    }),
+    new CopyWebpackPlugin({
+      patterns: [
+        { from: "./src/public/_redirects", to: "_redirects", noErrorOnMissing: true },
+      ],
     }),
     isDevelopment && new ReactRefreshWebpackPlugin(),
     !isDevelopment &&
