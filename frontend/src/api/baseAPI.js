@@ -13,13 +13,8 @@ const baseAPI = axios.create({
 });
 
 const fetchCSRFToken = async () => {
-  try {
-    const response = await baseAPI.get("/csrf-token");
-    return response.data.csrf_token;
-  } catch (error) {
-    console.error("Failed to fetch CSRF token:", error);
-    return null;
-  }
+  // CSRF disabled for Railway deployment
+  return null;
 };
 
 baseAPI.interceptors.request.use(
@@ -36,12 +31,13 @@ baseAPI.interceptors.request.use(
       }
     }
 
-    if (!isCSRFExempt && config.method !== "get") {
-      const csrfToken = await fetchCSRFToken();
-      if (csrfToken) {
-        config.headers["X-CSRF-Token"] = csrfToken;
-      }
-    }
+    // CSRF disabled for Railway deployment
+    // if (!isCSRFExempt && config.method !== "get") {
+    //   const csrfToken = await fetchCSRFToken();
+    //   if (csrfToken) {
+    //     config.headers["X-CSRF-Token"] = csrfToken;
+    //   }
+    // }
     return config;
   },
   (error) => Promise.reject(error)
@@ -81,6 +77,7 @@ baseAPI.interceptors.response.use(
   }
 );
 
-fetchCSRFToken().catch(console.error);
+// CSRF disabled for Railway deployment
+// fetchCSRFToken().catch(console.error);
 
 export default baseAPI;
