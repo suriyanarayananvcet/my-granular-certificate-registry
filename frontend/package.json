@@ -7,7 +7,7 @@
     "test": "test",
     "start": "webpack serve --mode development --open",
     "dev": "cross-env NODE_ENV=development webpack serve",
-    "build": "webpack --mode production"
+    "build": "react-scripts build"
   },
   "author": "Connor Galbraith",
   "license": "MIT",
