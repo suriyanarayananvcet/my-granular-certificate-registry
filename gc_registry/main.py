@@ -125,6 +125,7 @@ origins = [
     "https://frontend-ciatlb2uvq-ue.a.run.app",  # cloud run
     "https://api-ciatlb2uvq-ue.a.run.app",  # cloud run
     "https://demo-registry.energytag.org",
+    "https://my-granular-certificate-registry-n6t50x4mi.vercel.app",  # vercel frontend
 ]
 
 app.add_middleware(
