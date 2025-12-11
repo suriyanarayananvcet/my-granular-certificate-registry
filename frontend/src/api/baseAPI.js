@@ -5,7 +5,7 @@ const AUTH_LIST = ["/auth/login"];
 const CSRF_EXEMPT = ["/csrf-token"];
 
 const baseAPI = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "http://localhost:8000",
+  baseURL: "https://my-granular-certificate-registry-production.up.railway.app",
   headers: {
     "Content-Type": "application/json",
   },
