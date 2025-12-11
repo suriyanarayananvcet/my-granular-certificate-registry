@@ -94,7 +94,7 @@ module.exports = {
     }),
     new CopyWebpackPlugin({
       patterns: [
-        { from: "./src/public/_redirects", to: "_redirects", noErrorOnMissing: true },
+        { from: "./src/public/_redirects", to: "[name][ext]", noErrorOnMissing: true },
       ],
     }),
     isDevelopment && new ReactRefreshWebpackPlugin(),
