@@ -15,7 +15,7 @@ module.exports = {
   entry: "./src/index.js",
 
   output: {
-    path: path.resolve(__dirname, "dist"),
+    path: path.resolve(__dirname, "build"),
     filename: isDevelopment ? "[name].js" : "[name].[contenthash].js",
     chunkFilename: isDevelopment ? "[name].js" : "[name].[contenthash].js",
     publicPath: "/",
