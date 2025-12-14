@@ -5,6 +5,18 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     ENVIRONMENT: str = "LOCAL"
+    
+    # Railway database configuration
+    @property
+    def DATABASE_URL(self) -> str:
+        if self.ENVIRONMENT == "RAILWAY":
+            # Railway provides DATABASE_URL or construct from parts
+            railway_url = os.getenv("DATABASE_URL")
+            if railway_url:
+                return railway_url
+            # Fallback to constructed URL
+            return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.DATABASE_HOST_READ}:{self.DATABASE_PORT}/{self.POSTGRES_DB}"
 
     POSTGRES_HOST: str = os.getenv("POSTGRES_HOST", "127.0.0.1")
     POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", "5432"))
@@ -12,8 +24,8 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD")
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "granular_registry")
     
-    DATABASE_HOST_READ: str = os.getenv("DATABASE_HOST_READ", "db_read")
-    DATABASE_HOST_WRITE: str = os.getenv("DATABASE_HOST_WRITE", "db_write")
+    DATABASE_HOST_READ: str = os.getenv("DATABASE_HOST_READ", os.getenv("POSTGRES_HOST", "db_read"))
+    DATABASE_HOST_WRITE: str = os.getenv("DATABASE_HOST_WRITE", os.getenv("POSTGRES_HOST", "db_write"))
     DATABASE_PORT: int = int(os.getenv("DATABASE_PORT", "5432"))
     GCP_INSTANCE_READ: str = os.getenv("GCP_INSTANCE_READ", "")
     GCP_INSTANCE_WRITE: str = os.getenv("GCP_INSTANCE_WRITE", "")

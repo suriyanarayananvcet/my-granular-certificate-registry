@@ -1,3 +1,4 @@
+import os
 from typing import Any, Generator
 
 from sqlmodel import Session, SQLModel, create_engine
@@ -49,12 +50,18 @@ class DButils:
 
         if test:
             self.connection_str = f"sqlite:///{self._db_test_fp}"
-        else:
-            self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@{self._db_host}:{self._db_port}/{self._db_name}"
-
-        if settings.ENVIRONMENT == "PROD":
+        elif settings.ENVIRONMENT == "RAILWAY":
+            # For Railway, try DATABASE_URL first, then construct
+            railway_url = os.getenv("DATABASE_URL")
+            if railway_url:
+                self.connection_str = railway_url
+            else:
+                self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@{self._db_host}:{self._db_port}/{self._db_name}"
+        elif settings.ENVIRONMENT == "PROD":
             socket_path = f"/cloudsql/{self._gcp_instance}"
             self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@/{self._db_name}?host={socket_path}"
+        else:
+            self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@{self._db_host}:{self._db_port}/{self._db_name}"
 
         self.engine = create_engine(
             self.connection_str,
@@ -86,21 +93,34 @@ def get_db_name_to_client() -> dict[str, Any]:
     global db_name_to_client
 
     if db_name_to_client == {}:
-        db_mapping = [
-            ("db_read", settings.DATABASE_HOST_READ, settings.GCP_INSTANCE_READ),
-            ("db_write", settings.DATABASE_HOST_WRITE, settings.GCP_INSTANCE_WRITE),
-        ]
-
-        for db_name, db_host, gcp_instance in db_mapping:
+        if settings.ENVIRONMENT == "RAILWAY":
+            # For Railway, use the same database for both read and write
             db_client = DButils(
-                db_host=db_host,
+                db_host=settings.POSTGRES_HOST,
                 db_name=settings.POSTGRES_DB,
                 db_username=settings.POSTGRES_USER,
                 db_password=settings.POSTGRES_PASSWORD,
-                db_port=settings.DATABASE_PORT,
-                gcp_instance=gcp_instance,
+                db_port=settings.POSTGRES_PORT,
+                gcp_instance=None,
             )
-            db_name_to_client[db_name] = db_client
+            db_name_to_client["db_read"] = db_client
+            db_name_to_client["db_write"] = db_client
+        else:
+            db_mapping = [
+                ("db_read", settings.DATABASE_HOST_READ, settings.GCP_INSTANCE_READ),
+                ("db_write", settings.DATABASE_HOST_WRITE, settings.GCP_INSTANCE_WRITE),
+            ]
+
+            for db_name, db_host, gcp_instance in db_mapping:
+                db_client = DButils(
+                    db_host=db_host,
+                    db_name=settings.POSTGRES_DB,
+                    db_username=settings.POSTGRES_USER,
+                    db_password=settings.POSTGRES_PASSWORD,
+                    db_port=settings.DATABASE_PORT,
+                    gcp_instance=gcp_instance,
+                )
+                db_name_to_client[db_name] = db_client
 
     return db_name_to_client
 
