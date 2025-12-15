@@ -114,21 +114,8 @@ app = FastAPI(
 )
 
 
-origins = [
-    "http://localhost:9000",
-    "http://127.0.0.1:9000",
-    "http://localhost:8000",
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
-    "https://frontend-dot-rich-store-445612-c6.ew.r.appspot.com",  # app engine
-    "https://api-dot-rich-store-445612-c6.ew.r.appspot.com",  # app engine
-    "https://frontend-640576971908.us-east1.run.app",  # cloud run
-    "https://api-640576971908.us-east1.run.app",  # cloud run
-    "https://frontend-ciatlb2uvq-ue.a.run.app",  # cloud run
-    "https://api-ciatlb2uvq-ue.a.run.app",  # cloud run
-    "https://demo-registry.energytag.org",
-    "https://my-granular-certificate-registry-n6t50x4mi.vercel.app",  # vercel frontend
-]
+# Emergency CORS - allow all origins for demo
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
