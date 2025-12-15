@@ -44,3 +44,35 @@ export const mockHourlyData = () => {
     }))
   });
 };
+
+export const mockUserMe = () => {
+  return Promise.resolve({
+    data: {
+      id: 1,
+      name: "Admin User",
+      email: "admin@registry.com",
+      role: 4,
+      accounts: [
+        {
+          id: 1,
+          account_name: "Main Account",
+          user_ids: [1]
+        }
+      ],
+      organisation: "Demo Organization"
+    }
+  });
+};
+
+export const mockAccounts = () => {
+  return Promise.resolve({
+    data: [
+      {
+        id: 1,
+        account_name: "Main Account",
+        certificates_count: 15,
+        total_mwh: 2500.5
+      }
+    ]
+  });
+};

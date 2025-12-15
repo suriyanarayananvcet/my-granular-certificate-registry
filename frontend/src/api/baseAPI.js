@@ -1,6 +1,6 @@
 import axios from "axios";
 import Cookies from "js-cookie";
-import { mockLogin, mockCertificates, mockHourlyData } from "./mockAPI";
+import { mockLogin, mockCertificates, mockHourlyData, mockUserMe, mockAccounts } from "./mockAPI";
 
 // Enable demo mode when backend is unavailable
 const DEMO_MODE = true;
@@ -63,6 +63,12 @@ baseAPI.interceptors.response.use(
       }
       if (url?.includes("/hourly")) {
         return mockHourlyData();
+      }
+      if (url?.includes("/user/me")) {
+        return mockUserMe();
+      }
+      if (url?.includes("/account")) {
+        return mockAccounts();
       }
     }
 
