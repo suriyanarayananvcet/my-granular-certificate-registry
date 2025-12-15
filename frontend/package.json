@@ -1,15 +1,15 @@
 {
-  "name": "gc_registry",
+  "name": "gc_registry_frontend",
   "version": "1.0.0",
-  "description": "Open source, granular certificate registry demo created by Future Energy Associates.",
+  "description": "Granular Certificate Registry Frontend - Complete Demo System",
   "main": "index.js",
   "scripts": {
     "test": "test",
     "start": "webpack serve --mode development --open",
-    "dev": "cross-env NODE_ENV=development webpack serve",
+    "dev": "webpack serve --mode development",
     "build": "react-scripts build"
   },
-  "author": "Connor Galbraith",
+  "author": "Granular Certificate Registry Team",
   "license": "MIT",
   "dependencies": {
     "@reduxjs/toolkit": "^2.5.0",
@@ -24,6 +24,7 @@
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.1.1",
     "react-scripts": "^5.0.1",
+    "recharts": "^2.8.0",
     "redux": "^5.0.1",
     "redux-thunk": "^3.1.0"
   },
@@ -35,7 +36,6 @@
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.15",
     "babel-loader": "^9.2.1",
     "copy-webpack-plugin": "^13.0.1",
-    "cross-env": "^7.0.3",
     "css-loader": "^7.1.2",
     "css-minimizer-webpack-plugin": "^7.0.0",
     "file-loader": "^6.2.0",

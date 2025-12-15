@@ -1,6 +1,17 @@
 import axios from "axios";
 import Cookies from "js-cookie";
-import { mockLogin, mockCertificates, mockHourlyData, mockUserMe, mockAccounts } from "./mockAPI";
+import { 
+  mockLogin, 
+  mockCertificates, 
+  mockHourlyData, 
+  mockUserMe, 
+  mockAccounts,
+  mockDevices,
+  mockStorageRecords,
+  mockTransferCertificate,
+  mockCancelCertificate,
+  mockCreateCertificate
+} from "./completeMockAPI";
 
 // Enable demo mode when backend is unavailable
 const DEMO_MODE = true;
@@ -69,6 +80,18 @@ baseAPI.interceptors.response.use(
       }
       if (url?.includes("/account")) {
         return mockAccounts();
+      }
+      if (url?.includes("/device")) {
+        return mockDevices();
+      }
+      if (url?.includes("/storage")) {
+        return mockStorageRecords();
+      }
+      if (url?.includes("/transfer")) {
+        return mockTransferCertificate();
+      }
+      if (url?.includes("/create")) {
+        return mockCreateCertificate();
       }
     }
 
