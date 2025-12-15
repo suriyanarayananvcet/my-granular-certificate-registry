@@ -206,6 +206,13 @@ app.include_router(
     prefix="/auth",
 )
 
+# Demo page
+from .demo_page import router as demo_page_router
+app.include_router(
+    demo_page_router,
+    prefix="",
+)
+
 openapi_data = app.openapi()
 
 templates = Jinja2Templates(directory=STATIC_DIR_FP / "templates")
