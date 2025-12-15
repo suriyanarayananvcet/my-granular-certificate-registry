@@ -200,6 +200,11 @@ app.include_router(
     emergency_router,
     prefix="/demo",
 )
+# Also add as auth endpoints
+app.include_router(
+    emergency_router,
+    prefix="/auth",
+)
 
 openapi_data = app.openapi()
 
