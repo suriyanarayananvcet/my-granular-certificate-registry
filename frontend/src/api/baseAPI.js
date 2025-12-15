@@ -1,5 +1,9 @@
 import axios from "axios";
 import Cookies from "js-cookie";
+import { mockLogin, mockCertificates, mockHourlyData } from "./mockAPI";
+
+// Enable demo mode when backend is unavailable
+const DEMO_MODE = true;
 
 const AUTH_LIST = ["/auth/login"];
 const CSRF_EXEMPT = ["/csrf-token"];
@@ -47,6 +51,20 @@ baseAPI.interceptors.response.use(
   (response) => response,
   async (error) => {
     console.error(error);
+
+    // Demo mode fallback for CORS/network errors
+    if (DEMO_MODE && (error.code === "ERR_NETWORK" || !error.response)) {
+      const url = error.config?.url;
+      if (url?.includes("/auth/login")) {
+        return mockLogin();
+      }
+      if (url?.includes("/certificate")) {
+        return mockCertificates();
+      }
+      if (url?.includes("/hourly")) {
+        return mockHourlyData();
+      }
+    }
 
     // Check for a network error
     if (
