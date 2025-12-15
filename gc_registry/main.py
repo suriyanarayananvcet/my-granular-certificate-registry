@@ -207,6 +207,13 @@ app.include_router(
     prefix="/admin",
 )
 
+# Emergency demo endpoints
+from .emergency_user import router as emergency_router
+app.include_router(
+    emergency_router,
+    prefix="/demo",
+)
+
 openapi_data = app.openapi()
 
 templates = Jinja2Templates(directory=STATIC_DIR_FP / "templates")
