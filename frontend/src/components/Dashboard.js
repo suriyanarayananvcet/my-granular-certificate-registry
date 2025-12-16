@@ -149,7 +149,7 @@ const Dashboard = () => {
           color: status === 'active' ? 'green' : status === 'transferred' ? 'blue' : 'orange',
           fontWeight: 'bold'
         }}>
-          {status.toUpperCase()}
+          {status?.toUpperCase() || 'N/A'}
         </span>
       )
     },
@@ -182,7 +182,7 @@ const Dashboard = () => {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status) => <span style={{ color: 'green', fontWeight: 'bold' }}>{status.toUpperCase()}</span>
+      render: (status) => <span style={{ color: 'green', fontWeight: 'bold' }}>{status?.toUpperCase() || 'N/A'}</span>
     }
   ];
 
@@ -391,23 +391,23 @@ const Dashboard = () => {
             <Row gutter={[16, 16]}>
               <Col span={12}>
                 <Card title="Storage Charge Records (SCR)" size="small">
-                  {storageRecords.filter(r => r.id.startsWith('SCR')).map(record => (
+                  {storageRecords.filter(r => r.id?.startsWith('SCR')).map(record => (
                     <div key={record.id} style={{ marginBottom: '12px', padding: '8px', border: '1px solid #e6f7ff', borderRadius: '4px' }}>
                       <p><strong>{record.id}</strong></p>
                       <p>Energy Charged: {(record.energy_charged_kwh / 1000).toFixed(1)} MWh</p>
-                      <p>Status: <span style={{ color: 'green' }}>{record.status.toUpperCase()}</span></p>
+                      <p>Status: <span style={{ color: 'green' }}>{record.status?.toUpperCase() || 'N/A'}</span></p>
                     </div>
                   ))}
                 </Card>
               </Col>
               <Col span={12}>
                 <Card title="Storage Discharge Records (SDR)" size="small">
-                  {storageRecords.filter(r => r.id.startsWith('SDR')).map(record => (
+                  {storageRecords.filter(r => r.id?.startsWith('SDR')).map(record => (
                     <div key={record.id} style={{ marginBottom: '12px', padding: '8px', border: '1px solid #f6ffed', borderRadius: '4px' }}>
                       <p><strong>{record.id}</strong></p>
                       <p>Energy Discharged: {(record.energy_discharged_kwh / 1000).toFixed(1)} MWh</p>
                       <p>Efficiency: {(record.storage_efficiency * 100).toFixed(1)}%</p>
-                      <p>Status: <span style={{ color: 'green' }}>{record.status.toUpperCase()}</span></p>
+                      <p>Status: <span style={{ color: 'green' }}>{record.status?.toUpperCase() || 'N/A'}</span></p>
                     </div>
                   ))}
                 </Card>
@@ -426,7 +426,7 @@ const Dashboard = () => {
                     <p><strong>Technology:</strong> {device.technology}</p>
                     <p><strong>Capacity:</strong> {device.capacity_mw} MW</p>
                     <p><strong>Location:</strong> {device.location}</p>
-                    <p><strong>Status:</strong> <span style={{ color: 'green' }}>{device.status.toUpperCase()}</span></p>
+                    <p><strong>Status:</strong> <span style={{ color: 'green' }}>{device.status?.toUpperCase() || 'N/A'}</span></p>
                   </Card>
                 </Col>
               ))}
