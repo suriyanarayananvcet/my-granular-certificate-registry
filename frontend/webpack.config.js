@@ -99,10 +99,10 @@ module.exports = {
     }),
     isDevelopment && new ReactRefreshWebpackPlugin(),
     !isDevelopment &&
-      new BundleAnalyzerPlugin({
-        analyzerMode: "static",
-        openAnalyzer: false,
-      }),
+    new BundleAnalyzerPlugin({
+      analyzerMode: "static",
+      openAnalyzer: false,
+    }),
     new webpack.DefinePlugin({
       "process.env.REACT_APP_API_URL": JSON.stringify(
         process.env.REACT_APP_API_URL
@@ -116,7 +116,7 @@ module.exports = {
     },
     historyApiFallback: true,
     compress: true,
-    port: 8080,
+    port: process.env.PORT || 3000,
     host: '0.0.0.0',
     open: true,
     hot: true,

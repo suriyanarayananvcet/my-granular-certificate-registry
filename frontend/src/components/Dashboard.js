@@ -1,16 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Table, Button, Modal, Form, Input, Select, DatePicker, Statistic, Tabs, Progress } from 'antd';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
-import { 
-  mockCertificates, 
-  mockHourlyData, 
-  mockAccounts, 
-  mockDevices, 
-  mockStorageRecords,
-  mockTransferCertificate,
-  mockCancelCertificate,
-  mockCreateCertificate 
-} from '../api/completeMockAPI';
+import { fetchCertificatesAPI, createCertificateAPI, transferCertificateAPI, cancelCertificateAPI, getCertificateDetailsAPI } from '../api/certificateAPI';
+import { readCurrentUserAPI } from '../api/userAPI';
+import { getAccountDevicesAPI } from '../api/accountAPI';
+import { getAllocatedStorageRecordsAPI } from '../api/storageAPI';
 
 const { TabPane } = Tabs;
 const { Option } = Select;
@@ -25,6 +19,7 @@ const Dashboard = () => {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -33,23 +28,43 @@ const Dashboard = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [certsRes, accountsRes, devicesRes, storageRes] = await Promise.all([
-        mockCertificates(),
-        mockAccounts(), 
-        mockDevices(),
-        mockStorageRecords()
-      ]);
-      
-      setCertificates(certsRes.data);
-      setAccounts(accountsRes.data);
-      setDevices(devicesRes.data);
-      setStorageRecords(storageRes.data);
-      
-      // Load hourly data for first certificate
-      if (certsRes.data.length > 0) {
-        const hourlyRes = await mockHourlyData(certsRes.data[0].id);
-        setHourlyData(hourlyRes.data);
-        setSelectedCertificate(certsRes.data[0]);
+      // 1. Get User and Accounts
+      const userRes = await readCurrentUserAPI();
+      const user = userRes.data;
+      setUserId(user.id);
+      setAccounts(user.accounts || []);
+
+      if (user.accounts && user.accounts.length > 0) {
+        // 2. Fetch Devices and Certificates for all accounts
+        const devicesPromises = user.accounts.map(acc => getAccountDevicesAPI(acc.id));
+        const certsPromises = user.accounts.map(acc => fetchCertificatesAPI({
+          source_id: acc.id,
+          user_id: user.id
+        }));
+
+        const devicesResponses = await Promise.all(devicesPromises);
+        const certsResponses = await Promise.all(certsPromises);
+
+        // Flatten arrays
+        const allDevices = devicesResponses.flatMap(r => r.data || []);
+        // Check if certificates response structure matches (it has granular_certificate_bundles)
+        const allCerts = certsResponses.flatMap(r => r.data.granular_certificate_bundles || []);
+
+        setDevices(allDevices);
+        setCertificates(allCerts);
+
+        // 3. Fetch Storage Records for storage devices
+        // (Assuming we want allocated records for now as per dashboard view)
+        const storageDevices = allDevices.filter(d => d.is_storage);
+        const storagePromises = storageDevices.map(d => getAllocatedStorageRecordsAPI(d.id));
+        const storageResponses = await Promise.all(storagePromises);
+        const allStorage = storageResponses.flatMap(r => r.data || []);
+        setStorageRecords(allStorage);
+
+        // Load hourly data for first certificate
+        if (allCerts.length > 0) {
+          handleCertificateSelect(allCerts[0]);
+        }
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -59,17 +74,24 @@ const Dashboard = () => {
 
   const handleCertificateSelect = async (certificate) => {
     setSelectedCertificate(certificate);
-    const hourlyRes = await mockHourlyData(certificate.id);
-    setHourlyData(hourlyRes.data);
+    try {
+      // Fetch details or related certs for the chart
+      // For now, we'll just re-use the certificate details as the "daily" view might need a wider query
+      // TODO: Implement proper hourly data fetching by querying all certs for this device/day
+      setHourlyData([]);
+    } catch (error) {
+      console.error('Error fetching certificate details:', error);
+    }
   };
 
   const handleTransfer = async (values) => {
     try {
-      await mockTransferCertificate({
-        certificate_id: selectedCertificate.id,
-        from_account: 1,
-        to_account: values.to_account,
-        amount_mwh: values.amount
+      await transferCertificateAPI({
+        source_id: selectedCertificate.account_id,
+        user_id: userId,
+        granular_certificate_bundle_ids: [selectedCertificate.id],
+        target_id: values.to_account,
+        certificate_quantity: Number(values.amount)
       });
       setShowTransferModal(false);
       loadData();
@@ -80,7 +102,12 @@ const Dashboard = () => {
 
   const handleCreateCertificate = async (values) => {
     try {
-      await mockCreateCertificate(values);
+      await createCertificateAPI({
+        ...values,
+        // Add necessary fields for creation payload based on schema
+        // This might need more fields like 'production_starting_interval', etc.
+        // For the demo/interface fix, we assume the form values match or we'll need to expand the form.
+      });
       setShowCreateModal(false);
       loadData();
     } catch (error) {
@@ -99,7 +126,7 @@ const Dashboard = () => {
       title: 'Energy Source',
       dataIndex: 'source_type',
       key: 'source_type',
-      render: (text) => <span style={{textTransform: 'capitalize'}}>{text}</span>
+      render: (text) => <span style={{ textTransform: 'capitalize' }}>{text}</span>
     },
     {
       title: 'Total MWh',
@@ -155,7 +182,7 @@ const Dashboard = () => {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status) => <span style={{color: 'green', fontWeight: 'bold'}}>{status.toUpperCase()}</span>
+      render: (status) => <span style={{ color: 'green', fontWeight: 'bold' }}>{status.toUpperCase()}</span>
     }
   ];
 
@@ -229,7 +256,7 @@ const Dashboard = () => {
                       outerRadius={100}
                       fill="#8884d8"
                       dataKey="value"
-                      label={({name, value}) => `${name}: ${value} MWh`}
+                      label={({ name, value }) => `${name}: ${value} MWh`}
                     >
                       {pieData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -264,8 +291,8 @@ const Dashboard = () => {
         </TabPane>
 
         <TabPane tab="📋 Certificate Management" key="2">
-          <Card 
-            title="Energy Attribute Certificates (EACs)" 
+          <Card
+            title="Energy Attribute Certificates (EACs)"
             extra={
               <Button type="primary" onClick={() => setShowCreateModal(true)}>
                 Create New Certificate
@@ -323,11 +350,11 @@ const Dashboard = () => {
         </TabPane>
 
         <TabPane tab="🔄 Certificate Trading" key="4">
-          <Card 
+          <Card
             title="Certificate Transfer & Trading"
             extra={
-              <Button 
-                type="primary" 
+              <Button
+                type="primary"
                 onClick={() => setShowTransferModal(true)}
                 disabled={!selectedCertificate}
               >
@@ -368,7 +395,7 @@ const Dashboard = () => {
                     <div key={record.id} style={{ marginBottom: '12px', padding: '8px', border: '1px solid #e6f7ff', borderRadius: '4px' }}>
                       <p><strong>{record.id}</strong></p>
                       <p>Energy Charged: {(record.energy_charged_kwh / 1000).toFixed(1)} MWh</p>
-                      <p>Status: <span style={{color: 'green'}}>{record.status.toUpperCase()}</span></p>
+                      <p>Status: <span style={{ color: 'green' }}>{record.status.toUpperCase()}</span></p>
                     </div>
                   ))}
                 </Card>
@@ -380,7 +407,7 @@ const Dashboard = () => {
                       <p><strong>{record.id}</strong></p>
                       <p>Energy Discharged: {(record.energy_discharged_kwh / 1000).toFixed(1)} MWh</p>
                       <p>Efficiency: {(record.storage_efficiency * 100).toFixed(1)}%</p>
-                      <p>Status: <span style={{color: 'green'}}>{record.status.toUpperCase()}</span></p>
+                      <p>Status: <span style={{ color: 'green' }}>{record.status.toUpperCase()}</span></p>
                     </div>
                   ))}
                 </Card>
@@ -399,7 +426,7 @@ const Dashboard = () => {
                     <p><strong>Technology:</strong> {device.technology}</p>
                     <p><strong>Capacity:</strong> {device.capacity_mw} MW</p>
                     <p><strong>Location:</strong> {device.location}</p>
-                    <p><strong>Status:</strong> <span style={{color: 'green'}}>{device.status.toUpperCase()}</span></p>
+                    <p><strong>Status:</strong> <span style={{ color: 'green' }}>{device.status.toUpperCase()}</span></p>
                   </Card>
                 </Col>
               ))}

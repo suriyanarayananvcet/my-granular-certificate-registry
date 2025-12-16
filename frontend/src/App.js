@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Layout, Menu, Button, Avatar, Dropdown, Space, Typography } from 'antd';
-import { 
-  DashboardOutlined, 
-  FileTextOutlined, 
+import {
+  DashboardOutlined,
+  FileTextOutlined,
   ClockCircleOutlined,
   SwapOutlined,
-  BatteryOutlined,
+  ThunderboltOutlined,
   SettingOutlined,
   UserOutlined,
   LogoutOutlined
@@ -41,7 +41,7 @@ function App() {
       // Fallback to demo user
       setUser({
         id: 1,
-        name: "Admin User", 
+        name: "Admin User",
         email: "admin@registry.com",
         role: 4,
         organisation: "Demo Organization"
@@ -50,28 +50,23 @@ function App() {
     }
   };
 
-  const handleLogin = async (e) => {
+  const handleLogin = (e) => {
     e.preventDefault();
-    try {
-      // Always succeed with demo login
-      localStorage.setItem('access_token', 'demo_token_12345');
-      setIsLoggedIn(true);
-      
-      // Load mock user data
-      const response = await mockUserMe();
-      setUser(response.data);
-    } catch (error) {
-      console.error('Login failed:', error);
-      // Even if mock fails, still login
-      setIsLoggedIn(true);
-      setUser({
-        id: 1,
-        name: "Admin User",
-        email: "admin@registry.com",
-        role: 4,
-        organisation: "Demo Organization"
-      });
-    }
+    
+    // Direct demo login - no API calls
+    localStorage.setItem('access_token', 'demo_token_12345');
+    setIsLoggedIn(true);
+    setUser({
+      id: 1,
+      name: "Admin User",
+      email: "admin@registry.com",
+      role: 4,
+      organisation: "Demo Organization",
+      accounts: [
+        { id: 1, account_name: "Main Trading Account", user_ids: [1] },
+        { id: 2, account_name: "Storage Account", user_ids: [1] }
+      ]
+    });
   };
 
   const handleLogout = () => {
@@ -97,17 +92,17 @@ function App() {
 
   if (!isLoggedIn) {
     return (
-      <div style={{ 
-        height: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
+      <div style={{
+        height: '100vh',
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'center',
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
       }}>
-        <div style={{ 
-          background: 'white', 
-          padding: '40px', 
-          borderRadius: '12px', 
+        <div style={{
+          background: 'white',
+          padding: '40px',
+          borderRadius: '12px',
           boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
           width: '400px'
         }}>
@@ -119,7 +114,7 @@ function App() {
               EnergyTag 2.0 Compliant System
             </p>
           </div>
-          
+
           <form onSubmit={handleLogin}>
             <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
@@ -128,7 +123,7 @@ function App() {
               <input
                 type="email"
                 value={loginForm.email}
-                onChange={(e) => setLoginForm({...loginForm, email: e.target.value})}
+                onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
                 style={{
                   width: '100%',
                   padding: '12px',
@@ -139,7 +134,7 @@ function App() {
                 placeholder="Enter your email"
               />
             </div>
-            
+
             <div style={{ marginBottom: '30px' }}>
               <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
                 Password
@@ -147,7 +142,7 @@ function App() {
               <input
                 type="password"
                 value={loginForm.password}
-                onChange={(e) => setLoginForm({...loginForm, password: e.target.value})}
+                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                 style={{
                   width: '100%',
                   padding: '12px',
@@ -158,7 +153,7 @@ function App() {
                 placeholder="Enter your password"
               />
             </div>
-            
+
             <button
               type="submit"
               style={{
@@ -176,11 +171,11 @@ function App() {
               Login to Registry
             </button>
           </form>
-          
+
           <div style={{ marginTop: '20px', padding: '16px', background: '#f6ffed', borderRadius: '6px' }}>
             <p style={{ margin: 0, fontSize: '14px', color: '#52c41a' }}>
-              <strong>Demo Credentials:</strong><br/>
-              Email: admin@registry.com<br/>
+              <strong>Demo Credentials:</strong><br />
+              Email: admin@registry.com<br />
               Password: admin123
             </p>
           </div>
@@ -191,16 +186,16 @@ function App() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider 
-        collapsible 
-        collapsed={collapsed} 
+      <Sider
+        collapsible
+        collapsed={collapsed}
         onCollapse={setCollapsed}
         style={{ background: '#001529' }}
       >
-        <div style={{ 
-          height: '64px', 
-          display: 'flex', 
-          alignItems: 'center', 
+        <div style={{
+          height: '64px',
+          display: 'flex',
+          alignItems: 'center',
           justifyContent: 'center',
           color: 'white',
           fontSize: '18px',
@@ -208,7 +203,7 @@ function App() {
         }}>
           {collapsed ? '🌱' : '🌱 GC Registry'}
         </div>
-        
+
         <Menu theme="dark" defaultSelectedKeys={['dashboard']} mode="inline">
           <Menu.Item key="dashboard" icon={<DashboardOutlined />}>
             Dashboard
@@ -222,7 +217,7 @@ function App() {
           <Menu.Item key="trading" icon={<SwapOutlined />}>
             Trading
           </Menu.Item>
-          <Menu.Item key="storage" icon={<BatteryOutlined />}>
+          <Menu.Item key="storage" icon={<ThunderboltOutlined />}>
             Storage
           </Menu.Item>
           <Menu.Item key="devices" icon={<SettingOutlined />}>
@@ -230,20 +225,20 @@ function App() {
           </Menu.Item>
         </Menu>
       </Sider>
-      
+
       <Layout>
-        <Header style={{ 
-          background: 'white', 
-          padding: '0 24px', 
-          display: 'flex', 
-          justifyContent: 'space-between', 
+        <Header style={{
+          background: 'white',
+          padding: '0 24px',
+          display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
           boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
         }}>
           <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
             Granular Certificate Registry System
           </Title>
-          
+
           <Space>
             <span style={{ color: '#666' }}>Welcome back,</span>
             <Dropdown overlay={userMenu} placement="bottomRight">
@@ -254,7 +249,7 @@ function App() {
             </Dropdown>
           </Space>
         </Header>
-        
+
         <Content style={{ margin: '0', background: '#f0f2f5' }}>
           <Dashboard />
         </Content>

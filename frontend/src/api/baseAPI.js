@@ -1,10 +1,10 @@
 import axios from "axios";
 import Cookies from "js-cookie";
-import { 
-  mockLogin, 
-  mockCertificates, 
-  mockHourlyData, 
-  mockUserMe, 
+import {
+  mockLogin,
+  mockCertificates,
+  mockHourlyData,
+  mockUserMe,
   mockAccounts,
   mockDevices,
   mockStorageRecords,
@@ -15,6 +15,18 @@ import {
 
 // Enable demo mode when backend is unavailable
 const DEMO_MODE = true;
+
+// Override axios for demo mode
+if (DEMO_MODE) {
+  baseAPI.interceptors.request.use((config) => {
+    // Block all real API calls in demo mode
+    return Promise.reject({ 
+      code: 'DEMO_MODE',
+      config: config,
+      message: 'Demo mode - using mock data'
+    });
+  });
+}
 
 const AUTH_LIST = ["/auth/login"];
 const CSRF_EXEMPT = ["/csrf-token"];
@@ -40,7 +52,10 @@ baseAPI.interceptors.request.use(
     );
 
     if (!isAuthRoute) {
-      const token = Cookies.get("access_token");
+      let token = Cookies.get("access_token");
+      if (!token) {
+        token = localStorage.getItem("access_token");
+      }
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -63,8 +78,8 @@ baseAPI.interceptors.response.use(
   async (error) => {
     console.error(error);
 
-    // Demo mode fallback for CORS/network errors
-    if (DEMO_MODE && (error.code === "ERR_NETWORK" || !error.response)) {
+    // Demo mode fallback for all errors
+    if (DEMO_MODE && (error.code === "ERR_NETWORK" || error.code === "DEMO_MODE" || !error.response)) {
       const url = error.config?.url;
       if (url?.includes("/auth/login")) {
         return mockLogin();
@@ -95,14 +110,17 @@ baseAPI.interceptors.response.use(
       }
     }
 
-    // Check for a network error
-    if (
-      (error.code === "ERR_NETWORK" || !error.response) &&
-      window.location.pathname !== "/login"
-    ) {
-      // Redirect to login on network error
-      window.location.href = "/login";
-      return Promise.reject(error);
+    // In demo mode, don't redirect on errors
+    if (!DEMO_MODE) {
+      // Check for a network error
+      if (
+        (error.code === "ERR_NETWORK" || !error.response) &&
+        window.location.pathname !== "/login"
+      ) {
+        // Redirect to login on network error
+        window.location.href = "/login";
+        return Promise.reject(error);
+      }
     }
 
     if (
