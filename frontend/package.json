@@ -7,7 +7,7 @@
     "test": "test",
     "start": "webpack serve --mode development --open",
     "dev": "webpack serve --mode development",
-    "build": "react-scripts build"
+    "build": "webpack --mode production"
   },
   "author": "Granular Certificate Registry Team",
   "license": "MIT",
@@ -44,6 +44,7 @@
     "webpack": "^5.91.0",
     "webpack-bundle-analyzer": "^4.10.2",
     "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^5.0.4"
+    "webpack-dev-server": "^5.0.4",
+    "terser-webpack-plugin": "^5.3.10"
   }
 }

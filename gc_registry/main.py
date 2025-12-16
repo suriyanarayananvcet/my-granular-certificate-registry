@@ -115,7 +115,12 @@ app = FastAPI(
 
 
 # Emergency CORS - allow all origins for demo
-origins = ["*"]
+origins = [
+    "http://localhost:8080",
+    "http://localhost:8081",
+    "http://127.0.0.1:8080",
+    "http://127.0.0.1:8081",
+]
 
 app.add_middleware(
     CORSMiddleware,
