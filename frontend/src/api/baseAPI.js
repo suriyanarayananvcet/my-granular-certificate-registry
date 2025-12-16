@@ -16,18 +16,6 @@ import {
 // Enable demo mode when backend is unavailable
 const DEMO_MODE = true;
 
-// Override axios for demo mode
-if (DEMO_MODE) {
-  baseAPI.interceptors.request.use((config) => {
-    // Block all real API calls in demo mode
-    return Promise.reject({ 
-      code: 'DEMO_MODE',
-      config: config,
-      message: 'Demo mode - using mock data'
-    });
-  });
-}
-
 const AUTH_LIST = ["/auth/login"];
 const CSRF_EXEMPT = ["/csrf-token"];
 
@@ -43,6 +31,18 @@ const fetchCSRFToken = async () => {
   // CSRF disabled for Railway deployment
   return null;
 };
+
+// Override axios for demo mode
+if (DEMO_MODE) {
+  baseAPI.interceptors.request.use((config) => {
+    // Block all real API calls in demo mode
+    return Promise.reject({ 
+      code: 'DEMO_MODE',
+      config: config,
+      message: 'Demo mode - using mock data'
+    });
+  });
+}
 
 baseAPI.interceptors.request.use(
   async (config) => {
