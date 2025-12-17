@@ -66,10 +66,22 @@ const Dashboard = () => {
   };
 
   const handleTransfer = async (values) => {
-    // Mock transfer success
+    // Actually transfer the certificate
+    const updatedCerts = certificates.map(cert => {
+      if (cert.id === selectedCertificate.id) {
+        const transferAmount = parseFloat(values.amount);
+        if (transferAmount >= cert.total_mwh) {
+          return { ...cert, status: 'transferred', total_mwh: 0 };
+        } else {
+          return { ...cert, total_mwh: cert.total_mwh - transferAmount };
+        }
+      }
+      return cert;
+    });
+    
+    setCertificates(updatedCerts);
     setShowTransferModal(false);
-    alert('Certificate transferred successfully!');
-    loadData();
+    alert(`Transferred ${values.amount} MWh successfully!`);
   };
 
   const handleCreateCertificate = async (values) => {
@@ -324,36 +336,51 @@ const Dashboard = () => {
         </TabPane>
 
         <TabPane tab="🔄 Certificate Trading" key="4">
-          <Card
-            title="Certificate Transfer & Trading"
-            extra={
-              <Button
-                type="primary"
-                onClick={() => setShowTransferModal(true)}
-                disabled={!selectedCertificate}
-              >
-                Transfer Certificate
-              </Button>
-            }
-          >
+          <Card title="Certificate Transfer & Trading">
             <Row gutter={[16, 16]}>
-              <Col span={12}>
-                <Card title="Account Summary" size="small">
-                  {accounts.map(account => (
-                    <div key={account.id} style={{ marginBottom: '12px', padding: '8px', border: '1px solid #f0f0f0', borderRadius: '4px' }}>
-                      <p><strong>{account.account_name}</strong></p>
-                      <p>Certificates: {account.certificates_count} | Total: {account.total_mwh} MWh</p>
-                    </div>
-                  ))}
-                </Card>
-              </Col>
-              <Col span={12}>
-                <Card title="Recent Transactions" size="small">
-                  <div style={{ padding: '8px' }}>
-                    <p>✅ CERT-2024-001 → Transferred 100 MWh</p>
-                    <p>🔄 CERT-2024-002 → Converted to GCs</p>
-                    <p>❌ CERT-2024-003 → Cancelled 50 MWh</p>
-                  </div>
+              <Col span={24}>
+                <Card title="Select Certificate to Trade" size="small">
+                  <Table
+                    columns={[
+                      { title: 'ID', dataIndex: 'id', key: 'id' },
+                      { title: 'Type', dataIndex: 'source_type', key: 'source_type' },
+                      { title: 'Amount', dataIndex: 'total_mwh', key: 'total_mwh', render: (val) => `${val} MWh` },
+                      { title: 'Status', dataIndex: 'status', key: 'status' },
+                      {
+                        title: 'Actions',
+                        key: 'actions',
+                        render: (_, cert) => (
+                          <div>
+                            <Button 
+                              size="small" 
+                              onClick={() => { setSelectedCertificate(cert); setShowTransferModal(true); }}
+                              disabled={cert.status !== 'active'}
+                            >
+                              Transfer
+                            </Button>
+                            <Button 
+                              size="small" 
+                              danger 
+                              style={{ marginLeft: '8px' }}
+                              onClick={() => {
+                                setCertificates(prev => prev.map(c => 
+                                  c.id === cert.id ? { ...c, status: 'cancelled' } : c
+                                ));
+                                alert('Certificate cancelled!');
+                              }}
+                              disabled={cert.status !== 'active'}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        )
+                      }
+                    ]}
+                    dataSource={certificates}
+                    rowKey="id"
+                    size="small"
+                    pagination={{ pageSize: 5 }}
+                  />
                 </Card>
               </Col>
             </Row>
@@ -363,6 +390,58 @@ const Dashboard = () => {
         <TabPane tab="🔋 Storage Management" key="5">
           <Card title="Storage Device Operations">
             <Row gutter={[16, 16]}>
+              <Col span={24}>
+                <Card title="Storage Operations Control" size="small">
+                  <Row gutter={[16, 16]}>
+                    <Col span={8}>
+                      <Button 
+                        type="primary" 
+                        block
+                        onClick={() => {
+                          const newRecord = {
+                            id: `SCR-${Date.now()}`,
+                            energy_charged_kwh: Math.random() * 1000 + 500,
+                            status: 'active'
+                          };
+                          setStorageRecords(prev => [...prev, newRecord]);
+                          alert('Storage charge initiated!');
+                        }}
+                      >
+                        Start Charging
+                      </Button>
+                    </Col>
+                    <Col span={8}>
+                      <Button 
+                        block
+                        onClick={() => {
+                          const newRecord = {
+                            id: `SDR-${Date.now()}`,
+                            energy_discharged_kwh: Math.random() * 800 + 400,
+                            storage_efficiency: 0.85 + Math.random() * 0.1,
+                            status: 'active'
+                          };
+                          setStorageRecords(prev => [...prev, newRecord]);
+                          alert('Storage discharge initiated!');
+                        }}
+                      >
+                        Start Discharging
+                      </Button>
+                    </Col>
+                    <Col span={8}>
+                      <Button 
+                        danger
+                        block
+                        onClick={() => {
+                          setStorageRecords([]);
+                          alert('All storage records cleared!');
+                        }}
+                      >
+                        Clear Records
+                      </Button>
+                    </Col>
+                  </Row>
+                </Card>
+              </Col>
               <Col span={12}>
                 <Card title="Storage Charge Records (SCR)" size="small">
                   {storageRecords.filter(r => r.id?.startsWith('SCR')).map(record => (
@@ -370,6 +449,15 @@ const Dashboard = () => {
                       <p><strong>{record.id}</strong></p>
                       <p>Energy Charged: {(record.energy_charged_kwh / 1000).toFixed(1)} MWh</p>
                       <p>Status: <span style={{ color: 'green' }}>{record.status?.toUpperCase() || 'N/A'}</span></p>
+                      <Button 
+                        size="small" 
+                        danger
+                        onClick={() => {
+                          setStorageRecords(prev => prev.filter(r => r.id !== record.id));
+                        }}
+                      >
+                        Remove
+                      </Button>
                     </div>
                   ))}
                 </Card>
@@ -382,6 +470,15 @@ const Dashboard = () => {
                       <p>Energy Discharged: {(record.energy_discharged_kwh / 1000).toFixed(1)} MWh</p>
                       <p>Efficiency: {(record.storage_efficiency * 100).toFixed(1)}%</p>
                       <p>Status: <span style={{ color: 'green' }}>{record.status?.toUpperCase() || 'N/A'}</span></p>
+                      <Button 
+                        size="small" 
+                        danger
+                        onClick={() => {
+                          setStorageRecords(prev => prev.filter(r => r.id !== record.id));
+                        }}
+                      >
+                        Remove
+                      </Button>
                     </div>
                   ))}
                 </Card>
@@ -391,7 +488,28 @@ const Dashboard = () => {
         </TabPane>
 
         <TabPane tab="⚡ Device Management" key="6">
-          <Card title="Registered Devices">
+          <Card 
+            title="Registered Devices"
+            extra={
+              <Button 
+                type="primary"
+                onClick={() => {
+                  const newDevice = {
+                    id: `DEV-${Date.now()}`,
+                    name: `Device ${devices.length + 1}`,
+                    technology: ['solar', 'wind', 'hydro'][Math.floor(Math.random() * 3)],
+                    capacity_mw: Math.floor(Math.random() * 100) + 10,
+                    location: `Location ${devices.length + 1}`,
+                    status: 'active'
+                  };
+                  setDevices(prev => [...prev, newDevice]);
+                  alert('New device registered!');
+                }}
+              >
+                Add Device
+              </Button>
+            }
+          >
             <Row gutter={[16, 16]}>
               {devices.map(device => (
                 <Col span={8} key={device.id}>
@@ -400,7 +518,32 @@ const Dashboard = () => {
                     <p><strong>Technology:</strong> {device.technology}</p>
                     <p><strong>Capacity:</strong> {device.capacity_mw} MW</p>
                     <p><strong>Location:</strong> {device.location}</p>
-                    <p><strong>Status:</strong> <span style={{ color: 'green' }}>{device.status?.toUpperCase() || 'N/A'}</span></p>
+                    <p><strong>Status:</strong> <span style={{ color: device.status === 'active' ? 'green' : 'red' }}>{device.status?.toUpperCase() || 'N/A'}</span></p>
+                    <div style={{ marginTop: '8px' }}>
+                      <Button 
+                        size="small"
+                        onClick={() => {
+                          setDevices(prev => prev.map(d => 
+                            d.id === device.id 
+                              ? { ...d, status: d.status === 'active' ? 'inactive' : 'active' }
+                              : d
+                          ));
+                        }}
+                      >
+                        Toggle Status
+                      </Button>
+                      <Button 
+                        size="small" 
+                        danger
+                        style={{ marginLeft: '8px' }}
+                        onClick={() => {
+                          setDevices(prev => prev.filter(d => d.id !== device.id));
+                          alert('Device removed!');
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </div>
                   </Card>
                 </Col>
               ))}
