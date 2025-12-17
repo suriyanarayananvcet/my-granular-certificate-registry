@@ -14,7 +14,7 @@ import {
 } from "./completeMockAPI";
 
 // Enable demo mode when backend is unavailable
-const DEMO_MODE = true;
+const DEMO_MODE = false;
 
 const AUTH_LIST = ["/auth/login"];
 const CSRF_EXEMPT = ["/csrf-token"];
@@ -36,7 +36,7 @@ const fetchCSRFToken = async () => {
 if (DEMO_MODE) {
   baseAPI.interceptors.request.use((config) => {
     // Block all real API calls in demo mode
-    return Promise.reject({ 
+    return Promise.reject({
       code: 'DEMO_MODE',
       config: config,
       message: 'Demo mode - using mock data'

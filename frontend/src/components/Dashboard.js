@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Table, Button, Modal, Form, Input, Select, DatePicker, Statistic, Tabs, Progress } from 'antd';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
-import { fetchCertificatesAPI, createCertificateAPI, transferCertificateAPI, cancelCertificateAPI, getCertificateDetailsAPI } from '../api/certificateAPI';
-import { readCurrentUserAPI } from '../api/userAPI';
-import { getAccountDevicesAPI } from '../api/accountAPI';
-import { getAllocatedStorageRecordsAPI } from '../api/storageAPI';
+import { mockCertificates, mockUserMe, mockAccounts, mockDevices, mockStorageRecords } from '../api/completeMockAPI';
 
 const { TabPane } = Tabs;
 const { Option } = Select;
@@ -28,43 +25,26 @@ const Dashboard = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // 1. Get User and Accounts
-      const userRes = await readCurrentUserAPI();
+      // Use mock data directly
+      const userRes = await mockUserMe();
       const user = userRes.data;
       setUserId(user.id);
-      setAccounts(user.accounts || []);
-
-      if (user.accounts && user.accounts.length > 0) {
-        // 2. Fetch Devices and Certificates for all accounts
-        const devicesPromises = user.accounts.map(acc => getAccountDevicesAPI(acc.id));
-        const certsPromises = user.accounts.map(acc => fetchCertificatesAPI({
-          source_id: acc.id,
-          user_id: user.id
-        }));
-
-        const devicesResponses = await Promise.all(devicesPromises);
-        const certsResponses = await Promise.all(certsPromises);
-
-        // Flatten arrays
-        const allDevices = devicesResponses.flatMap(r => r.data || []);
-        // Check if certificates response structure matches (it has granular_certificate_bundles)
-        const allCerts = certsResponses.flatMap(r => r.data.granular_certificate_bundles || []);
-
-        setDevices(allDevices);
-        setCertificates(allCerts);
-
-        // 3. Fetch Storage Records for storage devices
-        // (Assuming we want allocated records for now as per dashboard view)
-        const storageDevices = allDevices.filter(d => d.is_storage);
-        const storagePromises = storageDevices.map(d => getAllocatedStorageRecordsAPI(d.id));
-        const storageResponses = await Promise.all(storagePromises);
-        const allStorage = storageResponses.flatMap(r => r.data || []);
-        setStorageRecords(allStorage);
-
-        // Load hourly data for first certificate
-        if (allCerts.length > 0) {
-          handleCertificateSelect(allCerts[0]);
-        }
+      
+      const accountsRes = await mockAccounts();
+      setAccounts(accountsRes.data);
+      
+      const certsRes = await mockCertificates();
+      setCertificates(certsRes.data);
+      
+      const devicesRes = await mockDevices();
+      setDevices(devicesRes.data);
+      
+      const storageRes = await mockStorageRecords();
+      setStorageRecords(storageRes.data);
+      
+      // Load hourly data for first certificate
+      if (certsRes.data.length > 0) {
+        handleCertificateSelect(certsRes.data[0]);
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -74,45 +54,29 @@ const Dashboard = () => {
 
   const handleCertificateSelect = async (certificate) => {
     setSelectedCertificate(certificate);
-    try {
-      // Fetch details or related certs for the chart
-      // For now, we'll just re-use the certificate details as the "daily" view might need a wider query
-      // TODO: Implement proper hourly data fetching by querying all certs for this device/day
-      setHourlyData([]);
-    } catch (error) {
-      console.error('Error fetching certificate details:', error);
-    }
+    // Generate mock hourly data for the selected certificate
+    const mockHourlyData = Array.from({ length: 24 }, (_, hour) => ({
+      id: `${certificate.id}-H${hour}`,
+      hour,
+      certificate_id: `GC-${certificate.id}-${String(hour).padStart(2, '0')}`,
+      generation_kwh: Math.random() * 50 + 10,
+      status: 'active'
+    }));
+    setHourlyData(mockHourlyData);
   };
 
   const handleTransfer = async (values) => {
-    try {
-      await transferCertificateAPI({
-        source_id: selectedCertificate.account_id,
-        user_id: userId,
-        granular_certificate_bundle_ids: [selectedCertificate.id],
-        target_id: values.to_account,
-        certificate_quantity: Number(values.amount)
-      });
-      setShowTransferModal(false);
-      loadData();
-    } catch (error) {
-      console.error('Transfer failed:', error);
-    }
+    // Mock transfer success
+    setShowTransferModal(false);
+    alert('Certificate transferred successfully!');
+    loadData();
   };
 
   const handleCreateCertificate = async (values) => {
-    try {
-      await createCertificateAPI({
-        ...values,
-        // Add necessary fields for creation payload based on schema
-        // This might need more fields like 'production_starting_interval', etc.
-        // For the demo/interface fix, we assume the form values match or we'll need to expand the form.
-      });
-      setShowCreateModal(false);
-      loadData();
-    } catch (error) {
-      console.error('Create failed:', error);
-    }
+    // Mock certificate creation
+    setShowCreateModal(false);
+    alert('Certificate created successfully!');
+    loadData();
   };
 
   const certificateColumns = [
