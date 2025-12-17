@@ -257,22 +257,22 @@ const Dashboard = () => {
               <Card title="System Status" style={{ height: '400px' }}>
                 <div style={{ marginBottom: '20px' }}>
                   <p>Certificate Conversion Rate</p>
-                  <Progress percent={Math.round((certificates.filter(c => c.hourly_certificates > 0).length / certificates.length) * 100) || 0} status="active" />
+                  <Progress percent={certificates.length > 0 ? Math.round((certificates.filter(c => c.hourly_certificates > 0).length / certificates.length) * 100) : 0} status="active" />
                   <small>{certificates.filter(c => c.hourly_certificates > 0).length} of {certificates.length} converted</small>
                 </div>
                 <div style={{ marginBottom: '20px' }}>
                   <p>Storage Efficiency</p>
-                  <Progress percent={Math.round(storageRecords.reduce((avg, r) => avg + (r.storage_efficiency || 0.9), 0) / Math.max(storageRecords.length, 1) * 100)} strokeColor="#52c41a" />
+                  <Progress percent={storageRecords.length > 0 ? Math.round(storageRecords.reduce((avg, r) => avg + (r.storage_efficiency || 0.9), 0) / storageRecords.length * 100) : 90} strokeColor="#52c41a" />
                   <small>{storageRecords.length} storage operations</small>
                 </div>
                 <div style={{ marginBottom: '20px' }}>
                   <p>Active Devices</p>
-                  <Progress percent={Math.round((devices.filter(d => d.status === 'active').length / devices.length) * 100) || 0} strokeColor="#1890ff" />
+                  <Progress percent={devices.length > 0 ? Math.round((devices.filter(d => d.status === 'active').length / devices.length) * 100) : 0} strokeColor="#1890ff" />
                   <small>{devices.filter(d => d.status === 'active').length} of {devices.length} active</small>
                 </div>
                 <div>
                   <p>System Health</p>
-                  <Progress percent={Math.round(((certificates.filter(c => c.status === 'active').length / certificates.length) + (devices.filter(d => d.status === 'active').length / devices.length)) / 2 * 100) || 95} strokeColor="#722ed1" />
+                  <Progress percent={certificates.length > 0 && devices.length > 0 ? Math.round(((certificates.filter(c => c.status === 'active').length / certificates.length) + (devices.filter(d => d.status === 'active').length / devices.length)) / 2 * 100) : 95} strokeColor="#722ed1" />
                   <small>Overall system performance</small>
                 </div>
               </Card>
