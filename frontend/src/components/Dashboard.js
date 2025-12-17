@@ -257,20 +257,91 @@ const Dashboard = () => {
               <Card title="System Status" style={{ height: '400px' }}>
                 <div style={{ marginBottom: '20px' }}>
                   <p>Certificate Conversion Rate</p>
-                  <Progress percent={85} status="active" />
+                  <Progress percent={Math.round((certificates.filter(c => c.hourly_certificates > 0).length / certificates.length) * 100) || 0} status="active" />
+                  <small>{certificates.filter(c => c.hourly_certificates > 0).length} of {certificates.length} converted</small>
                 </div>
                 <div style={{ marginBottom: '20px' }}>
                   <p>Storage Efficiency</p>
-                  <Progress percent={90} strokeColor="#52c41a" />
+                  <Progress percent={Math.round(storageRecords.reduce((avg, r) => avg + (r.storage_efficiency || 0.9), 0) / Math.max(storageRecords.length, 1) * 100)} strokeColor="#52c41a" />
+                  <small>{storageRecords.length} storage operations</small>
                 </div>
                 <div style={{ marginBottom: '20px' }}>
                   <p>Active Devices</p>
-                  <Progress percent={100} strokeColor="#1890ff" />
+                  <Progress percent={Math.round((devices.filter(d => d.status === 'active').length / devices.length) * 100) || 0} strokeColor="#1890ff" />
+                  <small>{devices.filter(d => d.status === 'active').length} of {devices.length} active</small>
                 </div>
                 <div>
                   <p>System Health</p>
-                  <Progress percent={95} strokeColor="#722ed1" />
+                  <Progress percent={Math.round(((certificates.filter(c => c.status === 'active').length / certificates.length) + (devices.filter(d => d.status === 'active').length / devices.length)) / 2 * 100) || 95} strokeColor="#722ed1" />
+                  <small>Overall system performance</small>
                 </div>
+              </Card>
+            </Col>
+          </Row>
+          <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
+            <Col span={24}>
+              <Card title="Quick Actions">
+                <Row gutter={[16, 16]}>
+                  <Col span={6}>
+                    <Button 
+                      type="primary" 
+                      block 
+                      size="large"
+                      onClick={() => setShowCreateModal(true)}
+                    >
+                      Create Certificate
+                    </Button>
+                  </Col>
+                  <Col span={6}>
+                    <Button 
+                      block 
+                      size="large"
+                      onClick={() => {
+                        const activeCerts = certificates.filter(c => c.status === 'active');
+                        if (activeCerts.length > 0) {
+                          setSelectedCertificate(activeCerts[0]);
+                          setShowTransferModal(true);
+                        } else {
+                          alert('No active certificates to transfer');
+                        }
+                      }}
+                    >
+                      Transfer Certificate
+                    </Button>
+                  </Col>
+                  <Col span={6}>
+                    <Button 
+                      block 
+                      size="large"
+                      onClick={() => {
+                        const newDevice = {
+                          id: `DEV-${Date.now()}`,
+                          name: `Device ${devices.length + 1}`,
+                          technology: ['solar', 'wind', 'hydro'][Math.floor(Math.random() * 3)],
+                          capacity_mw: Math.floor(Math.random() * 100) + 10,
+                          location: `Location ${devices.length + 1}`,
+                          status: 'active'
+                        };
+                        setDevices(prev => [...prev, newDevice]);
+                        alert('New device registered!');
+                      }}
+                    >
+                      Add Device
+                    </Button>
+                  </Col>
+                  <Col span={6}>
+                    <Button 
+                      block 
+                      size="large"
+                      onClick={() => {
+                        loadData();
+                        alert('Data refreshed!');
+                      }}
+                    >
+                      Refresh Data
+                    </Button>
+                  </Col>
+                </Row>
               </Card>
             </Col>
           </Row>
