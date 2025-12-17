@@ -73,10 +73,20 @@ const Dashboard = () => {
   };
 
   const handleCreateCertificate = async (values) => {
-    // Mock certificate creation
+    // Create new certificate and add to list
+    const newCert = {
+      id: `CERT-${Date.now()}`,
+      source_type: values.source_type,
+      total_mwh: parseFloat(values.total_mwh),
+      hourly_certificates: Math.floor(parseFloat(values.total_mwh) * 1000),
+      status: 'active',
+      device_name: devices.find(d => d.id === values.device_id)?.name || 'Unknown Device',
+      device_id: values.device_id
+    };
+    
+    setCertificates(prev => [...prev, newCert]);
     setShowCreateModal(false);
     alert('Certificate created successfully!');
-    loadData();
   };
 
   const certificateColumns = [
