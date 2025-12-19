@@ -52,7 +52,7 @@ function App() {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    
+
     // Direct demo login - no API calls
     localStorage.setItem('access_token', 'demo_token_12345');
     setIsLoggedIn(true);
@@ -73,6 +73,24 @@ function App() {
     localStorage.removeItem('access_token');
     setUser(null);
     setIsLoggedIn(false);
+  };
+
+  const [activeTab, setActiveTab] = useState('1');
+
+  const handleMenuClick = ({ key }) => {
+    const keyMap = {
+      'dashboard': '1',
+      'certificates': '2',
+      'hourly': '3',
+      'trading': '4',
+      'storage': '5',
+      'devices': '6'
+    };
+    setActiveTab(keyMap[key]);
+  };
+
+  const handleTabChange = (key) => {
+    setActiveTab(key);
   };
 
   const userMenu = (
@@ -97,7 +115,7 @@ function App() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+        background: 'linear-gradient(135deg, #a8e6cf 0%, #dcedc1 50%, #ffd3a5 100%)'
       }}>
         <div style={{
           background: 'white',
@@ -107,11 +125,11 @@ function App() {
           width: '400px'
         }}>
           <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-            <Title level={2} style={{ color: '#1890ff', marginBottom: '8px' }}>
-              🌱 Granular Certificate Registry
+            <Title level={2} style={{ color: '#2d5016', marginBottom: '8px' }}>
+              🏔️ Mt.Stonegate
             </Title>
-            <p style={{ color: '#666', fontSize: '16px' }}>
-              EnergyTag 2.0 Compliant System
+            <p style={{ color: '#4a7c59', fontSize: '16px', fontWeight: '500' }}>
+              Renewable Energy Registry
             </p>
           </div>
 
@@ -159,7 +177,7 @@ function App() {
               style={{
                 width: '100%',
                 padding: '12px',
-                background: '#1890ff',
+                background: 'linear-gradient(135deg, #2d5016 0%, #4a7c59 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '6px',
@@ -185,12 +203,12 @@ function App() {
   }
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f0fff0 0%, #e8f5e8 100%)' }}
       <Sider
         collapsible
         collapsed={collapsed}
         onCollapse={setCollapsed}
-        style={{ background: '#001529' }}
+        style={{ background: 'linear-gradient(180deg, #2d5016 0%, #1a3009 100%)' }}
       >
         <div style={{
           height: '64px',
@@ -201,10 +219,10 @@ function App() {
           fontSize: '18px',
           fontWeight: 'bold'
         }}>
-          {collapsed ? '🌱' : '🌱 GC Registry'}
+          {collapsed ? '🏔️' : '🏔️ Mt.Stonegate'}
         </div>
 
-        <Menu theme="dark" defaultSelectedKeys={['dashboard']} mode="inline">
+        <Menu theme="dark" defaultSelectedKeys={['dashboard']} mode="inline" onClick={handleMenuClick}>
           <Menu.Item key="dashboard" icon={<DashboardOutlined />}>
             Dashboard
           </Menu.Item>
@@ -228,15 +246,16 @@ function App() {
 
       <Layout>
         <Header style={{
-          background: 'white',
+          background: 'linear-gradient(135deg, #ffffff 0%, #f0fff0 100%)',
           padding: '0 24px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          boxShadow: '0 2px 8px rgba(45, 80, 22, 0.1)',
+          borderBottom: '2px solid #e8f5e8'
         }}>
-          <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
-            Granular Certificate Registry System
+          <Title level={3} style={{ margin: 0, color: '#2d5016' }}>
+            Mt.Stonegate - Renewable Energy Registry
           </Title>
 
           <Space>
@@ -250,8 +269,8 @@ function App() {
           </Space>
         </Header>
 
-        <Content style={{ margin: '0', background: '#f0f2f5' }}>
-          <Dashboard />
+        <Content style={{ margin: '0', background: 'linear-gradient(135deg, #f0fff0 0%, #e8f5e8 100%)' }}
+          <Dashboard activeTab={activeTab} onTabChange={handleTabChange} />
         </Content>
       </Layout>
     </Layout>
