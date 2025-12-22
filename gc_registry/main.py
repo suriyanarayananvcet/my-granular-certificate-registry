@@ -82,29 +82,48 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Starting up application...")
 
     try:
-        # Log all registered routes
-        logger.info("Registered routes:")
-        for route in app.routes:
-            methods = getattr(route, "methods", [])
-            logger.info(f"  {methods} {route.path}")
-
-        # Check for admin user existence
+        # Consolidate Seeding & Verification into Lifespan
         try:
             from sqlmodel import select
             from gc_registry.user.models import User
-            from gc_registry.core.database.db import get_read_session
+            from gc_registry.core.database.db import get_read_session, get_write_session
+            from gc_registry.authentication.services import get_password_hash
+            from gc_registry.core.database import events
+            from gc_registry.core.models.base import UserRoles
             
-            # Properly handle the generator dependency
-            with get_read_session() as read_session:
-                admin = read_session.exec(select(User).where(User.email == "admin@registry.com")).first()
-                if admin:
-                    logger.info("✅ Verified: admin@registry.com exists in database.")
-                else:
-                    logger.warning("❌ Warning: admin@registry.com NOT found in database.")
+            admin_email = "admin@registry.com"
+            
+            with get_write_session() as write_session:
+                with get_read_session() as read_session:
+                    # Check if admin exists
+                    admin = read_session.exec(select(User).where(User.email == admin_email)).first()
+                    
+                    if admin:
+                        logger.info(f"✅ Verified: {admin_email} exists in database.")
+                    else:
+                        logger.info(f"🌱 Seeding missing admin user: {admin_email}")
+                        
+                        # Handle optional ESDB
+                        try:
+                            esdb_client = events.get_esdb_client()
+                        except Exception:
+                            logger.warning("⚠️ EventStoreDB not available, skipping event logging for seeding.")
+                            esdb_client = None
+                            
+                        admin_user_dict = {
+                            "email": admin_email,
+                            "name": "Production Admin",
+                            "hashed_password": get_password_hash("admin123"),
+                            "role": UserRoles.ADMIN,
+                        }
+                        
+                        User.create(admin_user_dict, write_session, read_session, esdb_client)
+                        logger.info(f"✅ Created: {admin_email} successfully.")
                 
-        except Exception as db_err:
-            logger.error(f"Error checking user existence: {str(db_err)}")
-            
+        except Exception as seed_err:
+            logger.error(f"❌ Critical error during startup seeding: {str(seed_err)}")
+            # Do not crash the app, but log it clearly
+
         logger.info("Application startup complete")
         logger.info(f"Allowed CORS origins: {origins}")
         yield
@@ -115,11 +134,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     finally:
         logger.info("Shutting down application...")
-
         try:
             # TODO: Close database connections
             logger.info("Application shutdown complete")
-
         except Exception as e:
             logger.error(f"Error during application shutdown: {str(e)}")
             raise
