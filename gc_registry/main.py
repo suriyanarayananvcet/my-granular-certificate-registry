@@ -117,7 +117,9 @@ app = FastAPI(
 )
 
 
-# Emergency CORS - allow all origins for demo
+# --- Middleware and CORS Setup ---
+
+# Default local origins
 origins = [
     "http://localhost:8080",
     "http://localhost:8081",
@@ -126,16 +128,16 @@ origins = [
     "http://localhost:3000",
 ]
 
+# Add production origins from settings
+origins.extend(settings.cors_origins)
+
+# 1. ProxyHeadersMiddleware (Outermost - handles SSL termination/Original IP)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
+# 2. SessionMiddleware
 app.add_middleware(SessionMiddleware, secret_key=settings.MIDDLEWARE_SECRET_KEY)
 
-# CORS middleware initialization
-if settings.CORS_ALLOWED_ORIGINS:
-    for o in settings.CORS_ALLOWED_ORIGINS.split(","):
-        clean_o = o.strip().strip("'\"").rstrip("/")
-        if clean_o and clean_o not in origins:
-            origins.append(clean_o)
-
+# 3. CORSMiddleware (Handles preflights and domain white-listing)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -145,110 +147,58 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-# Request logger (KEEP AFTER CORS to ensure it runs first for requests)
-@app.middleware("http")
-async def log_headers(request: Request, call_next):
-    method = request.method
-    path = request.url.path
-    origin = request.headers.get("origin")
+
+# --- Error Handling & Logging ---
+
+@app.exception_handler(Exception)
+async def production_exception_handler(request: Request, exc: Exception):
+    """Global exception handler to ensure CORS headers are ALWAYS present."""
+    logger.exception(f"Unhandled error for {request.method} {request.url.path}")
     
-    if origin or method == "OPTIONS":
-        logger.info(f"START: {method} {path} | Origin: {origin}")
-        logger.debug(f"Req Headers: {dict(request.headers)}")
-        
-    try:
-        response = await call_next(request)
-        if origin or method == "OPTIONS":
-            logger.info(f"END: {method} {path} | Status: {response.status_code}")
-        return response
-    except Exception as e:
-        logger.exception(f"Error processing {method} {path}")
-        return JSONResponse(
-            status_code=500,
-            content={"detail": "Internal Server Error", "message": str(e)},
-            headers={
-                "Access-Control-Allow-Origin": origin if origin in origins else "",
-                "Access-Control-Allow-Credentials": "true"
-            }
-        )
+    # Extract origin for the error response CORS header
+    origin = request.headers.get("origin")
+    # Set allowed origin explicitly or fallback
+    allowed_origin = origin if origin in origins else (origins[0] if origins else "*")
 
-
-# Register exception handlers
-app.add_exception_handler(RequestValidationError, validation_exception_handler)  # type: ignore
-app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore
-app.add_exception_handler(Exception, general_exception_handler)  # type: ignore
-
-
-# Assemble fastapi loggers
-uvicorn_logger = logging.getLogger("uvicorn")
-uvicorn_access_logger = logging.getLogger("uvicorn.access")
-fastapi_logger = logging.getLogger("fastapi")
-
-
-@app.get("/csrf-token", tags=["Core"])
-async def get_csrf_token(request: Request, response: Response):
-    token = secrets.token_urlsafe(32)
-    request.session["csrf_token"] = token
-    response.set_cookie(
-        key="csrf_token", value=token, httponly=True, samesite="strict", secure=True
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal Server Error",
+            "message": str(exc) if settings.ENVIRONMENT != "PROD" else "An unexpected error occurred."
+        },
+        headers={
+            "Access-Control-Allow-Origin": allowed_origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*"
+        }
     )
-    return {"csrf_token": token}
 
+# Register specific handlers
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
 
-app.include_router(
-    certificate_router,
-    prefix="/certificate",
-)
-app.include_router(
-    storage_router,
-    prefix="/storage",
-)
-app.include_router(
-    user_router,
-    prefix="/user",
-)
-app.include_router(
-    account_router,
-    prefix="/account",
-)
-app.include_router(
-    device_router,
-    prefix="/device",
-)
-app.include_router(
-    measurements_router,
-    prefix="/measurement",
-)
-app.include_router(
-    auth_router,
-    prefix="/auth",
-)
+# --- Router Inclusions ---
 
-# Add seed endpoint
+app.include_router(auth_router, prefix="/auth")
+app.include_router(user_router, prefix="/user")
+app.include_router(account_router, prefix="/account")
+app.include_router(device_router, prefix="/device")
+app.include_router(certificate_router, prefix="/certificate")
+app.include_router(storage_router, prefix="/storage")
+app.include_router(measurements_router, prefix="/measurement")
+
+# Admin/Seed router
 from .seed_endpoint import router as seed_router
-app.include_router(
-    seed_router,
-    prefix="/admin",
-)
+app.include_router(seed_router, prefix="/admin")
 
-# Emergency demo endpoints
+# Demo/Emergency router
 from .emergency_user import router as emergency_router
-app.include_router(
-    emergency_router,
-    prefix="/demo",
-)
-# Also add as auth endpoints (REMOVED: caused conflict with real /auth/login)
-# app.include_router(
-#     emergency_router,
-#     prefix="/auth",
-# )
+app.include_router(emergency_router, prefix="/demo")
 
-# Demo page
+# Main Demo Page
 from .demo_page import router as demo_page_router
-app.include_router(
-    demo_page_router,
-    prefix="",
-)
+app.include_router(demo_page_router, prefix="")
 
 openapi_data = app.openapi()
 

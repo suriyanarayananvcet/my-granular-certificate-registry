@@ -39,6 +39,17 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     CORS_ALLOWED_ORIGINS: str = ""
 
+    @property
+    def cors_origins(self) -> list[str]:
+        """Parse CORS origins into a clean list."""
+        if not self.CORS_ALLOWED_ORIGINS:
+            return []
+        return [
+            o.strip().strip("'\"").rstrip("/") 
+            for o in self.CORS_ALLOWED_ORIGINS.split(",") 
+            if o.strip()
+        ]
+
     CERTIFICATE_GRANULARITY_HOURS: float = 1.0
     CAPACITY_MARGIN: float = 1.1
     CERTIFICATE_EXPIRY_YEARS: int = 2
