@@ -12,16 +12,17 @@ from sqlmodel import select
 def seed():
     print("Starting database seeding...", flush=True)
     
-    # Ensure we are using the environment variables
-    # (db.py is already robust enough to pick them up)
-    
     try:
-        # Get database connections
-        _ = db.get_db_name_to_client()
-        write_session = db.get_write_session()
-        read_session = db.get_read_session()
+        # Get database connections using the actual application logic
+        from gc_registry.core.database.db import get_write_session, get_read_session
         
-        # We might not have ESDB in production yet, so we'll mock the client if it fails
+        write_gen = get_write_session()
+        write_session = next(write_gen)
+        
+        read_gen = get_read_session()
+        read_session = next(read_gen)
+        
+        # We might not have ESDB in production yet
         try:
             esdb_client = events.get_esdb_client()
         except Exception:
@@ -31,14 +32,17 @@ def seed():
         admin_email = "admin@registry.com"
         admin_pass = "admin123"
         
+        print(f"Checking if user {admin_email} exists...", flush=True)
+        
         # Check if admin already exists
         existing_admin = read_session.exec(
             select(User).where(User.email == admin_email)
         ).first()
         
         if existing_admin:
-            print(f"✅ Admin user already exists: {admin_email}", flush=True)
+            print(f"✅ User {admin_email} already exists.", flush=True)
         else:
+            print(f"Creating user {admin_email}...", flush=True)
             # Create admin user
             admin_user_dict = {
                 "email": admin_email,
@@ -47,16 +51,16 @@ def seed():
                 "role": UserRoles.ADMIN,
             }
             
-            admin_user = User.create(
+            # This calling convention matches the app's services
+            User.create(
                 admin_user_dict, write_session, read_session, esdb_client
-            )[0]
+            )
             
-            print(f"✅ Admin user created successfully!", flush=True)
-            print(f"Email: {admin_email}", flush=True)
-            print(f"Password: {admin_pass}", flush=True)
-        
-        write_session.close()
-        read_session.close()
+            # Explicitly commit just in case
+            write_session.commit()
+            read_session.commit()
+            
+            print(f"✅ User {admin_email} created successfully!", flush=True)
         
     except Exception as e:
         print(f"❌ Error during seeding: {e}", flush=True)

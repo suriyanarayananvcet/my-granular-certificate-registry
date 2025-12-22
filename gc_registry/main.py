@@ -82,7 +82,31 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Starting up application...")
 
     try:
-        # TODO: Initialize database connections
+        # Log all registered routes
+        logger.info("Registered routes:")
+        for route in app.routes:
+            methods = getattr(route, "methods", [])
+            logger.info(f"  {methods} {route.path}")
+
+        # Check for admin user existence
+        try:
+            from sqlmodel import select
+            from gc_registry.user.models import User
+            from gc_registry.core.database.db import get_read_session
+            
+            # Use next() to get a session from the generator
+            read_gen = get_read_session()
+            read_session = next(read_gen)
+            
+            admin = read_session.exec(select(User).where(User.email == "admin@registry.com")).first()
+            if admin:
+                logger.info("✅ Verified: admin@registry.com exists in database.")
+            else:
+                logger.warning("❌ Warning: admin@registry.com NOT found in database.")
+                
+        except Exception as db_err:
+            logger.error(f"Error checking user existence: {str(db_err)}")
+            
         logger.info("Application startup complete")
         logger.info(f"Allowed CORS origins: {origins}")
         yield
@@ -176,6 +200,11 @@ async def production_exception_handler(request: Request, exc: Exception):
     )
 
 # Register specific handlers
+@app.exception_handler(404)
+async def custom_404_handler(request: Request, exc: HTTPException):
+    logger.warning(f"404 Not Found: {request.method} {request.url.path}")
+    return await http_exception_handler(request, exc)
+
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(HTTPException, http_exception_handler)
 
