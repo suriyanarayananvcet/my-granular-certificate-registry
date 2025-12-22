@@ -81,6 +81,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         # TODO: Initialize database connections
         logger.info("Application startup complete")
+        logger.info(f"Allowed CORS origins: {origins}")
         yield
 
     except Exception as e:
