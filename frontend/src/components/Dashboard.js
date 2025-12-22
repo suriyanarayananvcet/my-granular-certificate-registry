@@ -202,7 +202,7 @@ const Dashboard = ({ activeTab = "1", onTabChange }) => {
         <div style={{ background: '#fafafa', padding: '16px', borderRadius: '4px', marginBottom: '24px', border: '1px solid #f0f0f0' }}>
           <Row gutter={16} align="middle">
             <Col span={5}>
-              <Select placeholder="Device" style={{ width: '100%' }} suffixIcon={<ContainerOutlined />} allowClear>
+              <Select placeholder="Device" style={{ width: '100%' }} allowClear>
                 {devices.map(d => <Option key={d.id} value={d.id}>{d.name}</Option>)}
               </Select>
             </Col>

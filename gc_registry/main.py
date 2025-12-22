@@ -9,6 +9,8 @@ from fastapi import Depends, FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
+from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.security import HTTPBearer
 from fastapi.templating import Jinja2Templates
 from markdown import markdown
@@ -124,33 +126,51 @@ origins = [
     "http://localhost:3000",
 ]
 
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 app.add_middleware(SessionMiddleware, secret_key=settings.MIDDLEWARE_SECRET_KEY)
 
-# CORS middleware
+# CORS middleware initialization
 if settings.CORS_ALLOWED_ORIGINS:
-    origins.extend([o.strip() for o in settings.CORS_ALLOWED_ORIGINS.split(",")])
+    for o in settings.CORS_ALLOWED_ORIGINS.split(","):
+        clean_o = o.strip().strip("'\"").rstrip("/")
+        if clean_o and clean_o not in origins:
+            origins.append(clean_o)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["Content-Type", "Authorization", "X-CSRF-Token", "Accept", "Origin"],
     expose_headers=["*"],
 )
 
-# Request logger (outside CORS to debug preflights if needed, but wait CORS handles OPTIONS and returns early)
-# Actually, if we want to log preflights, we need the logger OUTSIDE CORS.
+# Request logger (KEEP AFTER CORS to ensure it runs first for requests)
 @app.middleware("http")
 async def log_headers(request: Request, call_next):
-    origin = request.headers.get("origin")
     method = request.method
     path = request.url.path
+    origin = request.headers.get("origin")
+    
     if origin or method == "OPTIONS":
-        logger.info(f"Incoming {method} {path} | Origin: {origin}")
-        logger.debug(f"Headers: {dict(request.headers)}")
-    response = await call_next(request)
-    return response
+        logger.info(f"START: {method} {path} | Origin: {origin}")
+        logger.debug(f"Req Headers: {dict(request.headers)}")
+        
+    try:
+        response = await call_next(request)
+        if origin or method == "OPTIONS":
+            logger.info(f"END: {method} {path} | Status: {response.status_code}")
+        return response
+    except Exception as e:
+        logger.exception(f"Error processing {method} {path}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal Server Error", "message": str(e)},
+            headers={
+                "Access-Control-Allow-Origin": origin if origin in origins else "",
+                "Access-Control-Allow-Credentials": "true"
+            }
+        )
 
 
 # Register exception handlers
@@ -217,11 +237,11 @@ app.include_router(
     emergency_router,
     prefix="/demo",
 )
-# Also add as auth endpoints
-app.include_router(
-    emergency_router,
-    prefix="/auth",
-)
+# Also add as auth endpoints (removed to avoid /auth/login conflict)
+# app.include_router(
+#     emergency_router,
+#     prefix="/auth",
+# )
 
 # Demo page
 from .demo_page import router as demo_page_router
