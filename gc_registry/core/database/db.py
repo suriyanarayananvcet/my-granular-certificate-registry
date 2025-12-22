@@ -51,32 +51,47 @@ class DButils:
         if test:
             self.connection_str = f"sqlite:///{self._db_test_fp}"
         else:
-            # Prioritize standard DATABASE_URL candidates
-            db_candidates = [
-                settings.DATABASE_URL,
-                settings.DATABASE_PRIVATE_URL,
-                settings.POSTGRES_URL,
-                os.getenv("DATABASE_URL"),
-                os.getenv("POSTGRES_URL")
-            ]
-            self.connection_str = next((c for c in db_candidates if c), None)
+            # Check for DATABASE_URL in order of priority
+            # 1. Direct from environment (Set by Railway/Heroku/etc)
+            # 2. From settings (Populated by Pydantic)
+            env_vars = ["DATABASE_URL", "DATABASE_PRIVATE_URL", "POSTGRES_URL"]
+            self.connection_str = None
+            source = None
+
+            for var in env_vars:
+                # Prioritize direct os.getenv to bypass any Pydantic caching/loading issues
+                val = os.getenv(var)
+                if val:
+                    self.connection_str = val
+                    source = f"env:{var}"
+                    break
+            
+            if not self.connection_str:
+                setting_vals = [settings.DATABASE_URL, settings.DATABASE_PRIVATE_URL, settings.POSTGRES_URL]
+                self.connection_str = next((v for v in setting_vals if v), None)
+                if self.connection_str:
+                    source = "settings:DATABASE_URL"
 
             if not self.connection_str:
                 if self._gcp_instance:
                     # Cloud SQL specific logic
                     socket_path = f"/cloudsql/{self._gcp_instance}"
                     self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@/{self._db_name}?host={socket_path}"
+                    source = "gcp_instance"
                 else:
                     # Fallback to standard construction
-                    self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@{self._db_host}:{self._db_port}/{self._db_name}"
+                    host = settings.POSTGRES_HOST if settings.ENVIRONMENT == "RAILWAY" else self._db_host
+                    port = settings.POSTGRES_PORT if settings.ENVIRONMENT == "RAILWAY" else self._db_port
+                    self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@{host}:{port}/{self._db_name}"
+                    source = "standard_fallback"
 
-        # Mask password for logging
+        # Log connection details (redacted)
         from urllib.parse import urlparse
         try:
+            from gc_registry.logging_config import logger
             parsed = urlparse(self.connection_str)
             redacted = self.connection_str.replace(parsed.password, "********") if parsed.password else self.connection_str
-            from gc_registry.logging_config import logger
-            logger.info(f"Initializing database connection: {redacted}")
+            logger.info(f"Database connection initialized from {source}: {redacted}")
         except Exception:
             pass
 
