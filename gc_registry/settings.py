@@ -18,10 +18,15 @@ class Settings(BaseSettings):
             return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.DATABASE_HOST_READ}:{self.DATABASE_PORT}/{self.POSTGRES_DB}"
 
+    # Database URLs (Railway / Cloud)
+    DATABASE_URL: str | None = os.getenv("DATABASE_URL")
+    DATABASE_PRIVATE_URL: str | None = os.getenv("DATABASE_PRIVATE_URL")
+    POSTGRES_URL: str | None = os.getenv("POSTGRES_URL")
+
     POSTGRES_HOST: str = os.getenv("POSTGRES_HOST", "127.0.0.1")
     POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", "5432"))
-    POSTGRES_USER: str = os.getenv("POSTGRES_USER")
-    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD")
+    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
+    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "postgres")
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "granular_registry")
     
     DATABASE_HOST_READ: str = os.getenv("DATABASE_HOST_READ", os.getenv("POSTGRES_HOST", "db_read"))

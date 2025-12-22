@@ -51,17 +51,34 @@ class DButils:
         if test:
             self.connection_str = f"sqlite:///{self._db_test_fp}"
         else:
-            # Prioritize standard DATABASE_URL (Railway, Render, etc.)
-            db_url = os.getenv("DATABASE_URL")
-            if db_url:
-                self.connection_str = db_url
-            elif self._gcp_instance:
-                # Cloud SQL specific logic
-                socket_path = f"/cloudsql/{self._gcp_instance}"
-                self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@/{self._db_name}?host={socket_path}"
-            else:
-                # Fallback to standard construction
-                self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@{self._db_host}:{self._db_port}/{self._db_name}"
+            # Prioritize standard DATABASE_URL candidates
+            db_candidates = [
+                settings.DATABASE_URL,
+                settings.DATABASE_PRIVATE_URL,
+                settings.POSTGRES_URL,
+                os.getenv("DATABASE_URL"),
+                os.getenv("POSTGRES_URL")
+            ]
+            self.connection_str = next((c for c in db_candidates if c), None)
+
+            if not self.connection_str:
+                if self._gcp_instance:
+                    # Cloud SQL specific logic
+                    socket_path = f"/cloudsql/{self._gcp_instance}"
+                    self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@/{self._db_name}?host={socket_path}"
+                else:
+                    # Fallback to standard construction
+                    self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@{self._db_host}:{self._db_port}/{self._db_name}"
+
+        # Mask password for logging
+        from urllib.parse import urlparse
+        try:
+            parsed = urlparse(self.connection_str)
+            redacted = self.connection_str.replace(parsed.password, "********") if parsed.password else self.connection_str
+            from gc_registry.logging_config import logger
+            logger.info(f"Initializing database connection: {redacted}")
+        except Exception:
+            pass
 
         self.engine = create_engine(
             self.connection_str,
