@@ -35,6 +35,7 @@ RUN apt update && apt install -y \
  COPY ./README.md ./README.md
  COPY ./Makefile ./Makefile
  COPY ./alembic.ini ./alembic.ini
+ COPY ./start.sh ./start.sh
 
 # Now install the project itself to make scripts available
 RUN poetry install --only-root
