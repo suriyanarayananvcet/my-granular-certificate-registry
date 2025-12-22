@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
 from fastapi.security import HTTPBearer
 from fastapi.templating import Jinja2Templates
 from markdown import markdown
@@ -237,7 +238,7 @@ app.include_router(
     emergency_router,
     prefix="/demo",
 )
-# Also add as auth endpoints (removed to avoid /auth/login conflict)
+# Also add as auth endpoints (REMOVED: caused conflict with real /auth/login)
 # app.include_router(
 #     emergency_router,
 #     prefix="/auth",

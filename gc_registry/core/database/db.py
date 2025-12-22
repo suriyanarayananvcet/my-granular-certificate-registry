@@ -50,18 +50,18 @@ class DButils:
 
         if test:
             self.connection_str = f"sqlite:///{self._db_test_fp}"
-        elif settings.ENVIRONMENT == "RAILWAY":
-            # For Railway, try DATABASE_URL first, then construct
-            railway_url = os.getenv("DATABASE_URL")
-            if railway_url:
-                self.connection_str = railway_url
-            else:
-                self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@{self._db_host}:{self._db_port}/{self._db_name}"
-        elif settings.ENVIRONMENT == "PROD":
-            socket_path = f"/cloudsql/{self._gcp_instance}"
-            self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@/{self._db_name}?host={socket_path}"
         else:
-            self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@{self._db_host}:{self._db_port}/{self._db_name}"
+            # Prioritize standard DATABASE_URL (Railway, Render, etc.)
+            db_url = os.getenv("DATABASE_URL")
+            if db_url:
+                self.connection_str = db_url
+            elif self._gcp_instance:
+                # Cloud SQL specific logic
+                socket_path = f"/cloudsql/{self._gcp_instance}"
+                self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@/{self._db_name}?host={socket_path}"
+            else:
+                # Fallback to standard construction
+                self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@{self._db_host}:{self._db_port}/{self._db_name}"
 
         self.engine = create_engine(
             self.connection_str,
