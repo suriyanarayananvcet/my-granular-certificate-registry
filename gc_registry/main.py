@@ -94,15 +94,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             from gc_registry.user.models import User
             from gc_registry.core.database.db import get_read_session
             
-            # Use next() to get a session from the generator
-            read_gen = get_read_session()
-            read_session = next(read_gen)
-            
-            admin = read_session.exec(select(User).where(User.email == "admin@registry.com")).first()
-            if admin:
-                logger.info("✅ Verified: admin@registry.com exists in database.")
-            else:
-                logger.warning("❌ Warning: admin@registry.com NOT found in database.")
+            # Properly handle the generator dependency
+            with get_read_session() as read_session:
+                admin = read_session.exec(select(User).where(User.email == "admin@registry.com")).first()
+                if admin:
+                    logger.info("✅ Verified: admin@registry.com exists in database.")
+                else:
+                    logger.warning("❌ Warning: admin@registry.com NOT found in database.")
                 
         except Exception as db_err:
             logger.error(f"Error checking user existence: {str(db_err)}")

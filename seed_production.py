@@ -66,6 +66,8 @@ def seed():
         print(f"❌ Error during seeding: {e}", flush=True)
         import traceback
         traceback.print_exc()
+        import sys
+        sys.exit(1)
 
 if __name__ == "__main__":
     seed()

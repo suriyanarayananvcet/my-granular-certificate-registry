@@ -164,16 +164,26 @@ def get_db_name_to_client() -> dict[str, Any]:
 
 
 def get_session(target: str) -> Generator[Session, None, None]:
-    with next(db_name_to_client[target].yield_session()) as session:
+    """Helper to get a session for a specific target database."""
+    # Ensure clients are initialized
+    clients = get_db_name_to_client()
+    
+    if target not in clients:
+        raise KeyError(f"Database client '{target}' not found. Initialized clients: {list(clients.keys())}")
+        
+    engine = clients[target].engine
+    with Session(engine) as session:
         try:
             yield session
         finally:
             session.close()
 
 
-def get_write_session() -> Session:
-    return next(get_session("db_write"))
+def get_write_session() -> Generator[Session, None, None]:
+    """FastAPI dependency for a write database session."""
+    yield from get_session("db_write")
 
 
-def get_read_session() -> Session:
-    return next(get_session("db_read"))
+def get_read_session() -> Generator[Session, None, None]:
+    """FastAPI dependency for a read database session."""
+    yield from get_session("db_read")
