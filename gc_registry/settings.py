@@ -6,17 +6,17 @@ class Settings(BaseSettings):
 
     ENVIRONMENT: str = "LOCAL"
     
-    # Primary Database Link (Railway/Cloud)
-    DATABASE_URL: str | None = None
-    DATABASE_PRIVATE_URL: str | None = None
-    POSTGRES_URL: str | None = None
+    # Database URLs (Railway / Cloud)
+    DATABASE_URL: str | None = os.getenv("DATABASE_URL")
+    DATABASE_PRIVATE_URL: str | None = os.getenv("DATABASE_PRIVATE_URL")
+    POSTGRES_URL: str | None = os.getenv("POSTGRES_URL")
 
-    # Fallback/Manual Configuration
-    POSTGRES_HOST: str = "127.0.0.1"
-    POSTGRES_PORT: int = 5432
-    POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "postgres"
-    POSTGRES_DB: str = "granular_registry"
+    # Fallback/Manual Configuration - Prioritize Railway names if available
+    POSTGRES_HOST: str = os.getenv("DATABASE_HOST_WRITE", os.getenv("POSTGRES_HOST", "127.0.0.1"))
+    POSTGRES_PORT: int = int(os.getenv("DATABASE_PORT", os.getenv("POSTGRES_PORT", "5432")))
+    POSTGRES_USER: str = os.getenv("POSTGRES_USER", os.getenv("DATABASE_USER", "postgres"))
+    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", os.getenv("DATABASE_PASSWORD", "postgres"))
+    POSTGRES_DB: str = os.getenv("POSTGRES_DB", os.getenv("DATABASE_NAME", "railway"))
     
     # Internal routing
     DATABASE_HOST_READ: str = "db_read"

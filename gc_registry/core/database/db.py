@@ -79,18 +79,24 @@ class DButils:
                     self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@/{self._db_name}?host={socket_path}"
                     source = "gcp_instance"
                 else:
-                    # Fallback to standard construction
-                    host = settings.POSTGRES_HOST if settings.ENVIRONMENT == "RAILWAY" else self._db_host
-                    port = settings.POSTGRES_PORT if settings.ENVIRONMENT == "RAILWAY" else self._db_port
-                    self.connection_str = f"postgresql://{self._db_username}:{self._db_password}@{host}:{port}/{self._db_name}"
-                    source = "standard_fallback"
+                    # Robust fallback using individual components
+                    user = self._db_username or settings.POSTGRES_USER
+                    password = self._db_password or settings.POSTGRES_PASSWORD
+                    host = settings.POSTGRES_HOST or self._db_host or "127.0.0.1"
+                    port = settings.POSTGRES_PORT or self._db_port or 5432
+                    db_name = self._db_name or settings.POSTGRES_DB or "railway"
+                    
+                    self.connection_str = f"postgresql://{user}:{password}@{host}:{port}/{db_name}"
+                    source = "explicit_component_fallback"
 
         # Log connection details (redacted)
         from urllib.parse import urlparse
         try:
             from gc_registry.logging_config import logger
             parsed = urlparse(self.connection_str)
-            redacted = self.connection_str.replace(parsed.password, "********") if parsed.password else self.connection_str
+            redacted = self.connection_str
+            if parsed.password:
+                redacted = self.connection_str.replace(parsed.password, "********")
             logger.info(f"Database connection initialized from {source}: {redacted}")
         except Exception:
             pass

@@ -10,7 +10,7 @@ from gc_registry.core.models.base import UserRoles
 from sqlmodel import select
 
 def seed():
-    print("Starting database seeding...")
+    print("Starting database seeding...", flush=True)
     
     # Ensure we are using the environment variables
     # (db.py is already robust enough to pick them up)
@@ -25,7 +25,7 @@ def seed():
         try:
             esdb_client = events.get_esdb_client()
         except Exception:
-            print("⚠️ EventStoreDB not available, skipping event logging for seeding.")
+            print("⚠️ EventStoreDB not available, skipping event logging for seeding.", flush=True)
             esdb_client = None
         
         admin_email = "admin@registry.com"
@@ -37,7 +37,7 @@ def seed():
         ).first()
         
         if existing_admin:
-            print(f"✅ Admin user already exists: {admin_email}")
+            print(f"✅ Admin user already exists: {admin_email}", flush=True)
         else:
             # Create admin user
             admin_user_dict = {
@@ -51,15 +51,15 @@ def seed():
                 admin_user_dict, write_session, read_session, esdb_client
             )[0]
             
-            print(f"✅ Admin user created successfully!")
-            print(f"Email: {admin_email}")
-            print(f"Password: {admin_pass}")
+            print(f"✅ Admin user created successfully!", flush=True)
+            print(f"Email: {admin_email}", flush=True)
+            print(f"Password: {admin_pass}", flush=True)
         
         write_session.close()
         read_session.close()
         
     except Exception as e:
-        print(f"❌ Error during seeding: {e}")
+        print(f"❌ Error during seeding: {e}", flush=True)
         import traceback
         traceback.print_exc()
 

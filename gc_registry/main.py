@@ -215,17 +215,21 @@ async def debug_env():
     for k, v in os.environ.items():
         if any(secret in k.upper() for secret in ["KEY", "PASS", "SECRET", "URL", "TOKEN"]):
             # Mask sensitive values
-            if len(v) > 8:
-                env_data[k] = f"{v[:4]}...{v[-4:]}"
+            if v:
+                env_data[k] = f"len:{len(v)} | {v[:4]}...{v[-4:]}" if len(v) > 8 else f"len:{len(v)} | ****"
             else:
-                env_data[k] = "****"
+                env_data[k] = "EMPTY"
         else:
             env_data[k] = v
     
     return {
         "environment_vars": env_data,
         "settings_db_url_is_none": settings.DATABASE_URL is None,
-        "settings_env": settings.ENVIRONMENT
+        "settings_db_url_len": len(settings.DATABASE_URL) if settings.DATABASE_URL else 0,
+        "settings_env": settings.ENVIRONMENT,
+        "settings_pg_host": settings.POSTGRES_HOST,
+        "settings_pg_port": settings.POSTGRES_PORT,
+        "settings_pg_db": settings.POSTGRES_DB
     }
 
 
