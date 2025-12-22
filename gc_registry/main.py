@@ -124,6 +124,9 @@ origins = [
     "http://localhost:3000",
 ]
 
+app.add_middleware(SessionMiddleware, secret_key=settings.MIDDLEWARE_SECRET_KEY)
+
+# CORS middleware
 if settings.CORS_ALLOWED_ORIGINS:
     origins.extend([o.strip() for o in settings.CORS_ALLOWED_ORIGINS.split(",")])
 
@@ -132,18 +135,22 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*", "X-CSRF-Token"],
-    expose_headers=["X-CSRF-Token"],
+    allow_headers=["*"],
+    expose_headers=["*"],
 )
 
-# Temporarily disable CSRF middleware
-# app.add_middleware(
-#     CSRFMiddleware,
-#     allow_origins=origins,
-#     exempt_paths={"/csrf-token", "/docs", "/redoc", "/openapi.json", "/user/create_test_account", "/user/create"},
-# )
-
-app.add_middleware(SessionMiddleware, secret_key=settings.MIDDLEWARE_SECRET_KEY)
+# Request logger (outside CORS to debug preflights if needed, but wait CORS handles OPTIONS and returns early)
+# Actually, if we want to log preflights, we need the logger OUTSIDE CORS.
+@app.middleware("http")
+async def log_headers(request: Request, call_next):
+    origin = request.headers.get("origin")
+    method = request.method
+    path = request.url.path
+    if origin or method == "OPTIONS":
+        logger.info(f"Incoming {method} {path} | Origin: {origin}")
+        logger.debug(f"Headers: {dict(request.headers)}")
+    response = await call_next(request)
+    return response
 
 
 # Register exception handlers
