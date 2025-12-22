@@ -36,6 +36,7 @@ RUN apt update && apt install -y \
  COPY ./Makefile ./Makefile
  COPY ./alembic.ini ./alembic.ini
  COPY ./start.sh ./start.sh
+ COPY ./seed_production.py ./seed_production.py
 
 # Now install the project itself to make scripts available
 RUN poetry install --only-root
