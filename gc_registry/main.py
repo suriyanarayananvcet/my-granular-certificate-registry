@@ -73,6 +73,28 @@ tags_metadata = [
 ]
 
 
+# --- Middleware and CORS Setup ---
+
+# Default local origins
+origins = [
+    "http://localhost:8080",
+    "http://localhost:8081",
+    "http://127.0.0.1:8080",
+    "http://127.0.0.1:8081",
+    "http://localhost:3000",
+]
+
+# Add production origins from settings
+origins.extend(settings.cors_origins)
+
+# Absolute fallback for this specific Vercel deployment to stop CORS errors
+vercel_origin = "https://my-granular-certificate-registry-n6t50x4mi.vercel.app"
+if vercel_origin not in origins:
+    origins.append(vercel_origin)
+
+logger.info(f"Initialized CORS origins: {origins}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
@@ -92,40 +114,49 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             from gc_registry.core.models.base import UserRoles
             
             admin_email = "admin@registry.com"
+            logger.info(f"🔍 Checking for admin user: {admin_email}")
             
-            with get_write_session() as write_session:
-                with get_read_session() as read_session:
-                    # Check if admin exists
-                    admin = read_session.exec(select(User).where(User.email == admin_email)).first()
+            with get_read_session() as read_session:
+                admin = read_session.exec(select(User).where(User.email == admin_email)).first()
+            
+            if admin:
+                logger.info(f"✅ Verified: {admin_email} exists in database.")
+            else:
+                logger.info(f"🌱 Seeding missing admin user: {admin_email}")
+                
+                # Handle optional ESDB with a strict timeout/safety
+                esdb_client = None
+                try:
+                    logger.info("Connecting to EventStoreDB (optional)...")
+                    esdb_client = events.get_esdb_client()
+                    logger.info("Connected to EventStoreDB.")
+                except Exception as e:
+                    logger.warning(f"⚠️ EventStoreDB not available ({str(e)}), skipping event logging for seeding.")
+                    esdb_client = None
                     
-                    if admin:
-                        logger.info(f"✅ Verified: {admin_email} exists in database.")
-                    else:
-                        logger.info(f"🌱 Seeding missing admin user: {admin_email}")
-                        
-                        # Handle optional ESDB
-                        try:
-                            esdb_client = events.get_esdb_client()
-                        except Exception:
-                            logger.warning("⚠️ EventStoreDB not available, skipping event logging for seeding.")
-                            esdb_client = None
-                            
-                        admin_user_dict = {
-                            "email": admin_email,
-                            "name": "Production Admin",
-                            "hashed_password": get_password_hash("admin123"),
-                            "role": UserRoles.ADMIN,
-                        }
-                        
+                logger.info("Generating password hash...")
+                hashed_pw = get_password_hash("admin123")
+                logger.info("Password hash generated.")
+                
+                admin_user_dict = {
+                    "email": admin_email,
+                    "name": "Production Admin",
+                    "hashed_password": hashed_pw,
+                    "role": UserRoles.ADMIN,
+                }
+                
+                logger.info("Writing admin user to database...")
+                with get_write_session() as write_session:
+                    with get_read_session() as read_session:
                         User.create(admin_user_dict, write_session, read_session, esdb_client)
-                        logger.info(f"✅ Created: {admin_email} successfully.")
+                logger.info(f"✅ Created: {admin_email} successfully.")
                 
         except Exception as seed_err:
             logger.error(f"❌ Critical error during startup seeding: {str(seed_err)}")
-            # Do not crash the app, but log it clearly
+            import traceback
+            logger.error(traceback.format_exc())
 
         logger.info("Application startup complete")
-        logger.info(f"Allowed CORS origins: {origins}")
         yield
 
     except Exception as e:
@@ -155,21 +186,6 @@ app = FastAPI(
     dependencies=[Depends(get_db_name_to_client)],
     lifespan=lifespan,
 )
-
-
-# --- Middleware and CORS Setup ---
-
-# Default local origins
-origins = [
-    "http://localhost:8080",
-    "http://localhost:8081",
-    "http://127.0.0.1:8080",
-    "http://127.0.0.1:8081",
-    "http://localhost:3000",
-]
-
-# Add production origins from settings
-origins.extend(settings.cors_origins)
 
 # 1. ProxyHeadersMiddleware (Outermost - handles SSL termination/Original IP)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
