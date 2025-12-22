@@ -1,14 +1,101 @@
-/* Basic App Styles */
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Modern Minimalist Registry - EnergyTag Reference */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --registry-primary: #1890ff;
+  /* Active Blue */
+  --registry-bg: #f8fafc;
+  /* Light background */
+  --registry-sidebar: #ffffff;
+  /* Light Sidebar */
+  --registry-border: #f0f0f0;
+  /* Soft borders */
+  --registry-text: #262626;
+  /* Main text */
+  --registry-text-sec: #8c8c8c;
+  /* Secondary text */
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--registry-bg);
+  color: var(--registry-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+.ant-layout {
+  background: var(--registry-bg);
+}
+
+.ant-layout-sider {
+  background: var(--registry-sidebar) !important;
+  border-right: 1px solid var(--registry-border);
+}
+
+.ant-menu {
+  background: var(--registry-sidebar) !important;
+  border-inline-end: none !important;
+}
+
+.ant-menu-item-selected {
+  background-color: #e6f7ff !important;
+  color: var(--registry-primary) !important;
+}
+
+.ant-card {
+  border-radius: 4px;
+  border: 1px solid var(--registry-border) !important;
+  box-shadow: none !important;
+}
+
+/* Split-Screen Login Layout */
+.login-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background: white;
+}
+
+.login-form-side {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.login-visual-side {
+  flex: 1.2;
+  background: linear-gradient(135deg, #1890ff 0%, #001529 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-visual-side::after {
+  content: "";
+  position: absolute;
+  width: 150%;
+  height: 150%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  top: -25%;
+  left: -25%;
+}
+
+.login-content-box {
+  width: 100%;
+  max-width: 400px;
+}
+
+/* Scrollbar refinement */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d9d9d9;
+  border-radius: 10px;
 }

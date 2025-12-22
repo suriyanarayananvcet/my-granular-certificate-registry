@@ -1,21 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Menu, Button, Avatar, Dropdown, Space, Typography } from 'antd';
+import { Layout, Menu, Button, Avatar, Dropdown, Space, Typography, Breadcrumb, Form, Input } from 'antd';
 import {
   DashboardOutlined,
-  FileTextOutlined,
-  ClockCircleOutlined,
+  FileProtectOutlined,
   SwapOutlined,
-  ThunderboltOutlined,
-  SettingOutlined,
+  ContainerOutlined,
   UserOutlined,
-  LogoutOutlined
+  LogoutOutlined,
 } from '@ant-design/icons';
 import Dashboard from './components/Dashboard';
 import { mockUserMe } from './api/completeMockAPI';
 import './App.css';
 
 const { Header, Sider, Content } = Layout;
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 function App() {
   const [collapsed, setCollapsed] = useState(false);
@@ -24,7 +22,6 @@ function App() {
   const [loginForm, setLoginForm] = useState({ email: 'admin@registry.com', password: 'admin123' });
 
   useEffect(() => {
-    // Check if user is logged in
     const token = localStorage.getItem('access_token');
     if (token) {
       loadUser();
@@ -37,36 +34,36 @@ function App() {
       setUser(response.data);
       setIsLoggedIn(true);
     } catch (error) {
-      console.error('Failed to load user:', error);
-      // Fallback to demo user
       setUser({
         id: 1,
-        name: "Admin User",
+        name: "Admin Director",
         email: "admin@registry.com",
         role: 4,
-        organisation: "Demo Organization"
+        organisation: "Mt. Stonegate Environmental"
       });
       setIsLoggedIn(true);
     }
   };
 
-  const handleLogin = (e) => {
-    e.preventDefault();
-
-    // Direct demo login - no API calls
-    localStorage.setItem('access_token', 'demo_token_12345');
-    setIsLoggedIn(true);
-    setUser({
-      id: 1,
-      name: "Admin User",
-      email: "admin@registry.com",
-      role: 4,
-      organisation: "Demo Organization",
-      accounts: [
-        { id: 1, account_name: "Main Trading Account", user_ids: [1] },
-        { id: 2, account_name: "Storage Account", user_ids: [1] }
-      ]
-    });
+  const handleLogin = (values) => {
+    // Check demo credentials
+    if (values.email === 'admin@registry.com' && values.password === 'admin123') {
+      localStorage.setItem('access_token', 'demo_token_12345');
+      setIsLoggedIn(true);
+      setUser({
+        id: 1,
+        name: "Admin Director",
+        email: "admin@registry.com",
+        role: 4,
+        organisation: "Mt. Stonegate Environmental",
+        accounts: [
+          { id: 1, account_name: "Asset Portfolio A", user_ids: [1] },
+          { id: 2, account_name: "Strategic Reserve", user_ids: [1] }
+        ]
+      });
+    } else {
+      alert('Invalid credentials. Use admin@registry.com / admin123');
+    }
   };
 
   const handleLogout = () => {
@@ -75,201 +72,130 @@ function App() {
     setIsLoggedIn(false);
   };
 
-  const [activeTab, setActiveTab] = useState('1');
+  const [activeTab, setActiveTab] = useState('1'); // Match EnergyTag: Certificates is key 1
 
   const handleMenuClick = ({ key }) => {
-    const keyMap = {
-      'dashboard': '1',
-      'certificates': '2',
-      'hourly': '3',
-      'trading': '4',
-      'storage': '5',
-      'devices': '6'
-    };
-    setActiveTab(keyMap[key]);
+    setActiveTab(key);
   };
 
   const handleTabChange = (key) => {
     setActiveTab(key);
   };
 
-  const userMenu = (
-    <Menu>
-      <Menu.Item key="profile" icon={<UserOutlined />}>
-        Profile
-      </Menu.Item>
-      <Menu.Item key="settings" icon={<SettingOutlined />}>
-        Settings
-      </Menu.Item>
-      <Menu.Divider />
-      <Menu.Item key="logout" icon={<LogoutOutlined />} onClick={handleLogout}>
-        Logout
-      </Menu.Item>
-    </Menu>
-  );
+  const userMenuItems = [
+    { key: 'profile', icon: <UserOutlined />, label: 'User Profile' },
+    { type: 'divider' },
+    { key: 'logout', icon: <LogoutOutlined />, label: 'Sign Out', onClick: handleLogout },
+  ];
 
   if (!isLoggedIn) {
     return (
-      <div style={{
-        height: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #a8e6cf 0%, #dcedc1 50%, #ffd3a5 100%)'
-      }}>
-        <div style={{
-          background: 'white',
-          padding: '40px',
-          borderRadius: '12px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-          width: '400px'
-        }}>
-          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-            <Title level={2} style={{ color: '#2d5016', marginBottom: '8px' }}>
-              🏔️ Mt.Stonegate
-            </Title>
-            <p style={{ color: '#4a7c59', fontSize: '16px', fontWeight: '500' }}>
-              Renewable Energy Registry
-            </p>
-          </div>
-
-          <form onSubmit={handleLogin}>
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-                Email Address
-              </label>
-              <input
-                type="email"
-                value={loginForm.email}
-                onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #d9d9d9',
-                  borderRadius: '6px',
-                  fontSize: '16px'
-                }}
-                placeholder="Enter your email"
-              />
+      <div className="login-container">
+        <div className="login-form-side">
+          <div className="login-content-box">
+            <div style={{ marginBottom: '40px' }}>
+              <Title level={2} style={{ margin: 0, fontWeight: 600 }}>Login to Account</Title>
+              <Text type="secondary">Please enter your email and password to continue</Text>
             </div>
 
-            <div style={{ marginBottom: '30px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-                Password
-              </label>
-              <input
-                type="password"
-                value={loginForm.password}
-                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #d9d9d9',
-                  borderRadius: '6px',
-                  fontSize: '16px'
-                }}
-                placeholder="Enter your password"
-              />
+            <Form layout="vertical" onFinish={handleLogin}>
+              <Form.Item label="Email" name="email" initialValue={loginForm.email}>
+                <Input size="large" />
+              </Form.Item>
+              <Form.Item
+                label={
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <span>Password</span>
+                    <a href="#forgot" style={{ fontSize: '12px' }}>Forgot password</a>
+                  </div>
+                }
+                name="password"
+                initialValue={loginForm.password}
+              >
+                <Input.Password size="large" />
+              </Form.Item>
+
+              <Button type="primary" size="large" block htmlType="submit" style={{ height: '48px', marginTop: '12px' }}>
+                Login
+              </Button>
+            </Form>
+
+            <div style={{ marginTop: '32px', textAlign: 'center' }}>
+              <Text type="secondary">Don't have an account? <a href="#request">Request account</a></Text>
             </div>
 
-            <button
-              type="submit"
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: 'linear-gradient(135deg, #2d5016 0%, #4a7c59 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '16px',
-                fontWeight: 'bold',
-                cursor: 'pointer'
-              }}
-            >
-              Login to Registry
-            </button>
-          </form>
-
-          <div style={{ marginTop: '20px', padding: '16px', background: '#f6ffed', borderRadius: '6px' }}>
-            <p style={{ margin: 0, fontSize: '14px', color: '#52c41a' }}>
-              <strong>Demo Credentials:</strong><br />
-              Email: admin@registry.com<br />
-              Password: admin123
-            </p>
+            <div style={{ marginTop: '80px', fontSize: '11px', color: '#8c8c8c' }}>
+              Made by Future Energy Associates Ltd. in partnership with: Private Energy Partners, Google and EnergyTag.
+            </div>
           </div>
+        </div>
+        <div className="login-visual-side">
+          <div style={{ position: 'absolute', top: '40px', right: '40px', textAlign: 'right', color: 'white' }}>
+            <Title level={3} style={{ color: 'white', margin: 0, letterSpacing: '1px' }}>Granular CertOS</Title>
+          </div>
+          {/* Visual abstract blobs handled in CSS via radial gradients */}
         </div>
       </div>
     );
   }
 
   return (
-    <Layout style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f0fff0 0%, #e8f5e8 100%)' }}
+    <Layout style={{ minHeight: '100vh', background: '#f5f7fa' }}>
       <Sider
         collapsible
         collapsed={collapsed}
         onCollapse={setCollapsed}
-        style={{ background: 'linear-gradient(180deg, #2d5016 0%, #1a3009 100%)' }}
+        width={240}
+        theme="light"
       >
         <div style={{
-          height: '64px',
+          height: '80px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          color: 'white',
-          fontSize: '18px',
-          fontWeight: 'bold'
+          padding: '0 24px',
+          color: '#1890ff',
         }}>
-          {collapsed ? '🏔️' : '🏔️ Mt.Stonegate'}
+          {!collapsed && <span style={{ fontWeight: 700, fontSize: '18px' }}>Granular CertOS</span>}
+          {collapsed && <span style={{ fontWeight: 700, fontSize: '14px' }}>GC</span>}
         </div>
 
-        <Menu theme="dark" defaultSelectedKeys={['dashboard']} mode="inline" onClick={handleMenuClick}>
-          <Menu.Item key="dashboard" icon={<DashboardOutlined />}>
-            Dashboard
-          </Menu.Item>
-          <Menu.Item key="certificates" icon={<FileTextOutlined />}>
-            Certificates
-          </Menu.Item>
-          <Menu.Item key="hourly" icon={<ClockCircleOutlined />}>
-            Hourly GCs
-          </Menu.Item>
-          <Menu.Item key="trading" icon={<SwapOutlined />}>
-            Trading
-          </Menu.Item>
-          <Menu.Item key="storage" icon={<ThunderboltOutlined />}>
-            Storage
-          </Menu.Item>
-          <Menu.Item key="devices" icon={<SettingOutlined />}>
-            Devices
-          </Menu.Item>
-        </Menu>
+        <Menu
+          theme="light"
+          selectedKeys={[activeTab]}
+          mode="inline"
+          onClick={handleMenuClick}
+          items={[
+            { key: '6', icon: <ContainerOutlined />, label: 'Device management' },
+            { key: '1', icon: <FileProtectOutlined />, label: 'Certificates' },
+            { key: '4', icon: <SwapOutlined />, label: 'Transfer History', disabled: true },
+          ]}
+        />
       </Sider>
 
-      <Layout>
+      <Layout style={{ background: '#f5f7fa' }}>
         <Header style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f0fff0 100%)',
-          padding: '0 24px',
+          background: 'transparent',
+          padding: '0 40px',
           display: 'flex',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-end',
           alignItems: 'center',
-          boxShadow: '0 2px 8px rgba(45, 80, 22, 0.1)',
-          borderBottom: '2px solid #e8f5e8'
+          height: '64px'
         }}>
-          <Title level={3} style={{ margin: 0, color: '#2d5016' }}>
-            Mt.Stonegate - Renewable Energy Registry
-          </Title>
-
-          <Space>
-            <span style={{ color: '#666' }}>Welcome back,</span>
-            <Dropdown overlay={userMenu} placement="bottomRight">
-              <Button type="text" style={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar icon={<UserOutlined />} style={{ marginRight: '8px' }} />
-                {user?.name}
-              </Button>
+          <Space size="large">
+            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', lineHeight: '1' }}>
+              <Text strong style={{ fontSize: '13px' }}>{user?.name}</Text>
+              <Text type="secondary" style={{ fontSize: '11px' }}>{user?.organisation}</Text>
+            </div>
+            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+              <Avatar
+                icon={<UserOutlined />}
+                style={{ backgroundColor: '#f0f0f0', color: '#8c8c8c', cursor: 'pointer' }}
+              />
             </Dropdown>
           </Space>
         </Header>
 
-        <Content style={{ margin: '0', background: 'linear-gradient(135deg, #f0fff0 0%, #e8f5e8 100%)' }}
+        <Content style={{ padding: '0 40px 40px 40px' }}>
           <Dashboard activeTab={activeTab} onTabChange={handleTabChange} />
         </Content>
       </Layout>

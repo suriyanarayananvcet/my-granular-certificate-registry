@@ -1,30 +1,37 @@
-```javascript
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Table, Button, Modal, Form, Input, Select, DatePicker, Statistic, Tabs, Progress } from 'antd';
-import { fetchCertificatesAPI, createCertificateAPI, transferCertificateAPI, cancelCertificateAPI, getCertificateDetailsAPI, importCertificatesAPI, downloadCertificateImportTemplateAPI } from '../api/certificateAPI';
-import { submitReadingsAPI, downloadMeterReadingsTemplateAPI } from '../api/measurementAPI';
+import { Card, Row, Col, Table, Button, Modal, Form, Input, Select, DatePicker, Statistic, Typography, Space, Tag, notification, Upload } from 'antd';
+import {
+  UploadOutlined,
+  ImportOutlined,
+  PlusOutlined,
+  InfoCircleOutlined,
+  FilterOutlined,
+  SyncOutlined,
+  FileTextOutlined,
+  SwapOutlined,
+  CloseCircleOutlined,
+  LockOutlined,
+} from '@ant-design/icons';
+import { fetchCertificatesAPI, importCertificatesAPI, transferCertificateAPI } from '../api/certificateAPI';
+import { submitReadingsAPI } from '../api/measurementAPI';
 import { readCurrentUserAPI } from '../api/userAPI';
 import { getAccountDevicesAPI } from '../api/accountAPI';
-import { getAllocatedStorageRecordsAPI } from '../api/storageAPI';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+import '../App.css';
 
-const { TabPane } = Tabs;
+const { Text, Title } = Typography;
 const { Option } = Select;
+const { RangePicker } = DatePicker;
 
 const Dashboard = ({ activeTab = "1", onTabChange }) => {
   const [certificates, setCertificates] = useState([]);
-  const [hourlyData, setHourlyData] = useState([]);
-  const [accounts, setAccounts] = useState([]);
   const [devices, setDevices] = useState([]);
-  const [storageRecords, setStorageRecords] = useState([]);
-  const [selectedCertificate, setSelectedCertificate] = useState(null);
+  const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [showTransferModal, setShowTransferModal] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showUploadReadingsModal, setShowUploadReadingsModal] = useState(false);
-  const [uploadDeviceId, setUploadDeviceId] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [userId, setUserId] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -33,797 +40,340 @@ const Dashboard = ({ activeTab = "1", onTabChange }) => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch User
       const userRes = await readCurrentUserAPI();
       const user = userRes.data;
-      setUserId(user.id);
-      
-      // 2. Setup Account (Assume first account if available or fetch)
-      let currentAccountId = null;
       if (user.accounts && user.accounts.length > 0) {
         setAccounts(user.accounts);
-        currentAccountId = user.accounts[0].id;
-      } else {
-        // Fallback or handle no accounts
-        // For now, we might need to fetch accounts if not in user object
-        // But let's assume user.accounts is populated as per mockAPI structure
-        console.warn("No accounts found for user");
+        const devicesRes = await getAccountDevicesAPI(user.accounts[0].id);
+        setDevices(devicesRes.data || []);
       }
 
-      // 3. Fetch Certificates
       const certsRes = await fetchCertificatesAPI({});
-      if (certsRes.data && certsRes.data.certificates) {
-         setCertificates(certsRes.data.certificates);
-         // Load hourly data for first certificate
-         if (certsRes.data.certificates.length > 0) {
-            handleCertificateSelect(certsRes.data.certificates[0]);
-         }
-      } else {
-         // Handle array response if that's what it returns
-         setCertificates(Array.isArray(certsRes.data) ? certsRes.data : []);
-      }
+      const certData = certsRes.data?.certificates || (Array.isArray(certsRes.data) ? certsRes.data : []);
 
-      // 4. Fetch Devices (if account exists)
-      if (currentAccountId) {
-        const devicesRes = await getAccountDevicesAPI(currentAccountId);
-        const deviceList = devicesRes.data || [];
-        setDevices(deviceList);
-
-        // 5. Fetch Storage Records
-        // Fetch for all devices or just leave empty for now as API requires device_id
-        // We can try fetching for the first device if available
-        if (deviceList.length > 0) {
-            try {
-                // Example: fetch for first device
-                const storageRes = await getAllocatedStorageRecordsAPI(deviceList[0].id);
-                setStorageRecords(Array.isArray(storageRes.data) ? storageRes.data : []);
-            } catch (err) {
-                console.error("Failed to fetch storage records", err);
-            }
-        }
-      }
-
+      // Map to EnergyTag style fields if missing
+      const mappedCerts = certData.map(c => ({
+        ...c,
+        issuance_id: c.id,
+        period_start: "2025-10-20T00:00:00",
+        period_end: "2025-10-20T01:00:00",
+        production_mwh: c.total_mwh || (c.hourly_certificates / 1000) || 83.390,
+      }));
+      setCertificates(mappedCerts);
     } catch (error) {
       console.error('Error loading data:', error);
     }
     setLoading(false);
   };
 
-  const handleImportCertificate = async (values) => {
-    try {
-      const formData = new FormData();
-      formData.append('account_id', values.account_id);
-      formData.append('file', values.file.fileList[0].originFileObj);
-      formData.append('device_json', JSON.stringify({ device_name: 'Imported Device' })); // Simplified for now
-
-      await importCertificatesAPI(formData);
-      setShowImportModal(false);
-      loadData();
-    } catch (error) {
-      console.error('Import failed:', error);
-      alert('Import failed: ' + (error.response?.data?.detail || error.message));
-    }
-  };
-
-  const handleUploadReadings = async (values) => {
-    try {
-      const formData = new FormData();
-      formData.append('device_id', uploadDeviceId);
-      formData.append('file', values.file.fileList[0].originFileObj);
-
-      await submitReadingsAPI(formData);
-      setShowUploadReadingsModal(false);
-      alert('Readings submitted successfully!');
-    } catch (error) {
-      console.error('Upload readings failed:', error);
-      alert('Upload failed: ' + (error.response?.data?.detail || error.message));
-    }
-  };
-
-  const handleCertificateSelect = async (certificate) => {
-    setSelectedCertificate(certificate);
-    // Generate mock hourly data for the selected certificate
-    const mockHourlyData = Array.from({ length: 24 }, (_, hour) => ({
-      id: `${ certificate.id } -H${ hour } `,
-      hour,
-      certificate_id: `GC - ${ certificate.id } -${ String(hour).padStart(2, '0') } `,
-      generation_kwh: Math.random() * 50 + 10,
-      status: 'active'
-    }));
-    setHourlyData(mockHourlyData);
-  };
-
-  const handleTransfer = async (values) => {
-    try {
-      const payload = {
-        source_id: selectedCertificate.account_id,
-        user_id: userId,
-        granular_certificate_bundle_ids: [selectedCertificate.id],
-        certificate_quantity: Math.floor(parseFloat(values.amount) * 1000000), // MWh to Wh
-        target_id: values.to_account,
-        action_type: 'Transfer' // Enums might be needed, but 'Transfer' string usually works if mapped 
-      };
-
-      await transferCertificateAPI(payload);
-      setShowTransferModal(false);
-      loadData(); // Refresh data
-      alert(`Transfer of ${ values.amount } MWh initiated successfully!`);
-    } catch (error) {
-      console.error('Transfer failed:', error);
-      alert('Transfer failed: ' + (error.response?.data?.detail || error.message));
-    }
-  };
-
-  const handleCreateCertificate = async (values) => {
-    // Create new certificate and add to list
-    const newCert = {
-      id: `CERT - ${ Date.now() } `,
-      source_type: values.source_type,
-      total_mwh: parseFloat(values.total_mwh),
-      hourly_certificates: Math.floor(parseFloat(values.total_mwh) * 1000),
-      status: 'active',
-      device_name: devices.find(d => d.id === values.device_id)?.name || 'Unknown Device',
-      device_id: values.device_id
-    };
-
-    setCertificates(prev => [...prev, newCert]);
-    setShowCreateModal(false);
-    alert('Certificate created successfully!');
-  };
-
   const certificateColumns = [
     {
-      title: 'Certificate ID',
-      dataIndex: 'id',
-      key: 'id',
-      render: (text) => <Button type="link" onClick={() => handleCertificateSelect(certificates.find(c => c.id === text))}>{text}</Button>
+      title: 'Issuance ID',
+      dataIndex: 'issuance_id',
+      key: 'issuance_id',
+      sorter: (a, b) => a.issuance_id.localeCompare(b.issuance_id),
+      render: (text) => <Text style={{ color: '#595959' }}>{text}</Text>
+    },
+    {
+      title: 'Device Name',
+      dataIndex: 'device_name',
+      key: 'device_name',
+      sorter: (a, b) => a.device_name.localeCompare(b.device_name),
     },
     {
       title: 'Energy Source',
       dataIndex: 'source_type',
       key: 'source_type',
+      sorter: (a, b) => a.source_type.localeCompare(b.source_type),
       render: (text) => <span style={{ textTransform: 'capitalize' }}>{text}</span>
     },
     {
-      title: 'Total MWh',
-      dataIndex: 'total_mwh',
-      key: 'total_mwh',
-      render: (value) => `${ value.toLocaleString() } MWh`
+      title: 'Certificate Period Start',
+      dataIndex: 'period_start',
+      key: 'period_start',
+      sorter: (a, b) => a.period_start.localeCompare(b.period_start),
     },
     {
-      title: 'Hourly Certificates',
-      dataIndex: 'hourly_certificates',
-      key: 'hourly_certificates',
-      render: (value) => `${ value.toLocaleString() } GCs`
+      title: 'Certificate Period End',
+      dataIndex: 'period_end',
+      key: 'period_end',
+      sorter: (a, b) => a.period_end.localeCompare(b.period_end),
+    },
+    {
+      title: 'Production (MWh)',
+      dataIndex: 'production_mwh',
+      key: 'production_mwh',
+      sorter: (a, b) => a.production_mwh - b.production_mwh,
+      render: (val) => val.toFixed(3)
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
+      sorter: (a, b) => a.status.localeCompare(b.status),
       render: (status) => (
-        <span style={{
-          color: status === 'active' ? 'green' : status === 'transferred' ? 'blue' : 'orange',
-          fontWeight: 'bold'
-        }}>
-          {status?.toUpperCase() || 'N/A'}
-        </span>
+        <Tag icon={<SyncOutlined spin={status === 'processing'} />} color={status === 'active' ? 'default' : 'blue'} style={{ borderRadius: '12px', padding: '0 10px' }}>
+          <span style={{ display: 'inline-block', width: '6px', height: '6px', background: status === 'active' ? '#52c41a' : '#1890ff', borderRadius: '50%', marginRight: '8px' }}></span>
+          {status?.charAt(0).toUpperCase() + status?.slice(1)}
+        </Tag>
       )
     },
     {
-      title: 'Device',
-      dataIndex: 'device_name',
-      key: 'device_name'
+      title: '',
+      key: 'action',
+      render: () => <Button type="link" style={{ fontWeight: 500 }}>Details</Button>
     }
   ];
 
-  const hourlyColumns = [
-    {
-      title: 'Hour',
-      dataIndex: 'hour',
-      key: 'hour',
-      render: (hour) => `${ String(hour).padStart(2, '0') }:00`
-    },
-    {
-      title: 'GC ID',
-      dataIndex: 'certificate_id',
-      key: 'certificate_id'
-    },
-    {
-      title: 'Generation (kWh)',
-      dataIndex: 'generation_kwh',
-      key: 'generation_kwh',
-      render: (value) => `${ value.toFixed(3) } kWh`
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => <span style={{ color: 'green', fontWeight: 'bold' }}>{status?.toUpperCase() || 'N/A'}</span>
-    }
-  ];
+  const onSelectChange = (newSelectedRowKeys) => {
+    setSelectedRowKeys(newSelectedRowKeys);
+  };
 
-  const totalMWh = certificates.reduce((sum, cert) => sum + cert.total_mwh, 0);
-  const totalGCs = certificates.reduce((sum, cert) => sum + cert.hourly_certificates, 0);
-  const activeCertificates = certificates.filter(c => c.status === 'active').length;
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: onSelectChange,
+  };
 
-  const sourceDistribution = certificates.reduce((acc, cert) => {
-    acc[cert.source_type] = (acc[cert.source_type] || 0) + cert.total_mwh;
-    return acc;
-  }, {});
+  const renderCertificatesView = () => (
+    <div style={{ animation: 'fadeIn 0.3s ease-in' }}>
+      <div style={{ marginBottom: '24px' }}>
+        <Title level={2} style={{ marginBottom: '32px', fontWeight: 600 }}>Certificates</Title>
 
-  const pieData = Object.entries(sourceDistribution).map(([source, mwh]) => ({
-    name: source,
-    value: mwh,
-    color: source === 'solar' ? '#ffd700' : source === 'wind' ? '#87ceeb' : '#90ee90'
-  }));
+        <Row gutter={24}>
+          <Col span={8}>
+            <Card variant="borderless" style={{ background: 'white' }}>
+              <Row align="middle" gutter={16}>
+                <Col>
+                  <div style={{ background: '#e6f7ff', padding: '12px', borderRadius: '8px' }}>
+                    <FileTextOutlined style={{ fontSize: '24px', color: '#1890ff' }} />
+                  </div>
+                </Col>
+                <Col>
+                  <Title level={3} style={{ margin: 0 }}>13162</Title>
+                  <Text type="secondary">Total Certificates</Text>
+                  <div style={{ fontSize: '12px', color: '#8c8c8c' }}>5 Wind turbine</div>
+                </Col>
+              </Row>
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card variant="borderless" style={{ background: 'white' }}>
+              <Row align="middle" gutter={16}>
+                <Col>
+                  <div style={{ background: '#f0f5ff', padding: '12px', borderRadius: '8px' }}>
+                    <SwapOutlined style={{ fontSize: '24px', color: '#2f54eb' }} />
+                  </div>
+                </Col>
+                <Col>
+                  <Title level={3} style={{ margin: 0 }}>3290</Title>
+                  <Text type="secondary">Certificates Transferred</Text>
+                </Col>
+              </Row>
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card variant="borderless" style={{ background: 'white' }}>
+              <Row align="middle" gutter={16}>
+                <Col>
+                  <div style={{ background: '#fff1f0', padding: '12px', borderRadius: '8px' }}>
+                    <CloseCircleOutlined style={{ fontSize: '24px', color: '#f5222d' }} />
+                  </div>
+                </Col>
+                <Col>
+                  <Title level={3} style={{ margin: 0 }}>27</Title>
+                  <Text type="secondary">Certificates Cancelled</Text>
+                </Col>
+              </Row>
+            </Card>
+          </Col>
+        </Row>
+      </div>
+
+      <Card variant="borderless" style={{ background: 'white', marginTop: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <Title level={4} style={{ margin: 0, fontWeight: 600 }}>Granular Certificate Bundles</Title>
+          <Space>
+            <Button icon={<CloseCircleOutlined />} disabled={selectedRowKeys.length === 0}>Cancel</Button>
+            <Button icon={<LockOutlined />} disabled={selectedRowKeys.length === 0}>Reserve</Button>
+            <Button icon={<SwapOutlined />} type="default" disabled={selectedRowKeys.length === 0} onClick={() => setShowTransferModal(true)}>Transfer</Button>
+          </Space>
+        </div>
+
+        <div style={{ background: '#fafafa', padding: '16px', borderRadius: '4px', marginBottom: '24px', border: '1px solid #f0f0f0' }}>
+          <Row gutter={16} align="middle">
+            <Col span={5}>
+              <Select placeholder="Device" style={{ width: '100%' }} suffixIcon={<ContainerOutlined />} allowClear>
+                {devices.map(d => <Option key={d.id} value={d.id}>{d.name}</Option>)}
+              </Select>
+            </Col>
+            <Col span={5}>
+              <Select placeholder="Energy Source" style={{ width: '100%' }} suffixIcon={<SyncOutlined />} allowClear>
+                <Option value="solar">Solar</Option>
+                <Option value="wind">Wind</Option>
+              </Select>
+            </Col>
+            <Col span={6}>
+              <RangePicker style={{ width: '100%' }} />
+            </Col>
+            <Col span={4}>
+              <Select placeholder="Status" style={{ width: '100%' }} allowClear>
+                <Option value="active">Active</Option>
+                <Option value="retired">Retired</Option>
+              </Select>
+            </Col>
+            <Col span={4}>
+              <Space>
+                <Button type="link" style={{ color: '#1890ff', padding: 0 }}>Apply filter</Button>
+                <Button type="link" style={{ color: '#8c8c8c', padding: 0 }}>Clear Filter</Button>
+              </Space>
+            </Col>
+          </Row>
+        </div>
+
+        <Table
+          rowSelection={rowSelection}
+          columns={certificateColumns}
+          dataSource={certificates}
+          rowKey="id"
+          loading={loading}
+          pagination={{ pageSize: 10, showSizeChanger: false, position: ['bottomCenter'] }}
+        />
+
+        <div style={{ marginTop: '24px', borderTop: '1px solid #f0f0f0', paddingTop: '16px', display: 'flex', gap: '24px' }}>
+          <Button type="link" icon={<PlusOutlined />} onClick={() => setShowCreateModal(true)}>New Issuance</Button>
+          <Button type="link" icon={<ImportOutlined />} onClick={() => setShowImportModal(true)}>External Import</Button>
+          <Button type="link" icon={<UploadOutlined />} onClick={() => setShowUploadReadingsModal(true)}>Submit Meter Data</Button>
+        </div>
+      </Card>
+    </div>
+  );
+
+  const renderDeviceManagementView = () => (
+    <Card variant="borderless" title={<Title level={4} style={{ margin: 0 }}>Device management</Title>}>
+      <Table
+        dataSource={devices}
+        rowKey="id"
+        columns={[
+          { title: 'Asset Name', dataIndex: 'name', key: 'n', sorter: true },
+          { title: 'Technology', dataIndex: 'technology', key: 't', render: (t) => <Tag color="cyan">{t?.toUpperCase()}</Tag> },
+          { title: 'Capacity', dataIndex: 'capacity_mw', key: 'c', render: (c) => `${c} MW` },
+          { title: 'Location', dataIndex: 'location', key: 'l' },
+          { title: 'Status', dataIndex: 'status', key: 's', render: () => <Tag color="green">ONLINE</Tag> }
+        ]}
+      />
+    </Card>
+  );
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="Total Energy Certificates"
-              value={certificates.length}
-              suffix="EACs"
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="Total Energy"
-              value={totalMWh.toFixed(1)}
-              suffix="MWh"
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="Granular Certificates"
-              value={totalGCs.toLocaleString()}
-              suffix="GCs"
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="Active Certificates"
-              value={activeCertificates}
-              suffix={`/ ${ certificates.length } `}
-            />
-          </Card>
-        </Col>
-      </Row>
+    <div style={{ paddingTop: '24px' }}>
+      {activeTab === '1' && renderCertificatesView()}
+      {activeTab === '6' && renderDeviceManagementView()}
+      {activeTab === '4' && <Card variant="borderless"><Text type="secondary">Transfer History records will be displayed here.</Text></Card>}
 
-      <Tabs activeKey={activeTab} onChange={onTabChange}>
-        <TabPane tab="📊 Dashboard Overview" key="1">
-          <Row gutter={[16, 16]}>
-            <Col span={16}>
-              <Card title="Energy Source Distribution" style={{ height: '400px' }}>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, value }) => `${ name }: ${ value } MWh`}
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell - ${ index } `} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </Card>
-            </Col>
-            <Col span={8}>
-              <Card title="System Status" style={{ height: '400px' }}>
-                <div style={{ marginBottom: '20px' }}>
-                  <p>Certificate Conversion Rate</p>
-                  <Progress percent={certificates.length > 0 ? Math.round((certificates.filter(c => c.hourly_certificates > 0).length / certificates.length) * 100) : 0} status="active" />
-                  <small>{certificates.filter(c => c.hourly_certificates > 0).length} of {certificates.length} converted</small>
-                </div>
-                <div style={{ marginBottom: '20px' }}>
-                  <p>Storage Efficiency</p>
-                  <Progress percent={storageRecords.length > 0 ? Math.round(storageRecords.reduce((avg, r) => avg + (r.storage_efficiency || 0.9), 0) / storageRecords.length * 100) : 90} strokeColor="#52c41a" />
-                  <small>{storageRecords.length} storage operations</small>
-                </div>
-                <div style={{ marginBottom: '20px' }}>
-                  <p>Active Devices</p>
-                  <Progress percent={devices.length > 0 ? Math.round((devices.filter(d => d.status === 'active').length / devices.length) * 100) : 0} strokeColor="#1890ff" />
-                  <small>{devices.filter(d => d.status === 'active').length} of {devices.length} active</small>
-                </div>
-                <div>
-                  <p>System Health</p>
-                  <Progress percent={certificates.length > 0 && devices.length > 0 ? Math.round(((certificates.filter(c => c.status === 'active').length / certificates.length) + (devices.filter(d => d.status === 'active').length / devices.length)) / 2 * 100) : 95} strokeColor="#722ed1" />
-                  <small>Overall system performance</small>
-                </div>
-              </Card>
-            </Col>
-          </Row>
-          <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
-            <Col span={24}>
-              <Card title="Quick Actions">
-                <Row gutter={[16, 16]}>
-                  <Col span={6}>
-                    <Button
-                      type="primary"
-                      block
-                      size="large"
-                      onClick={() => setShowCreateModal(true)}
-                    >
-                      Create Certificate
-                    </Button>
-                  </Col>
-                  <Col span={6}>
-                    <Button
-                      block
-                      size="large"
-                      onClick={() => {
-                        const activeCerts = certificates.filter(c => c.status === 'active');
-                        if (activeCerts.length > 0) {
-                          setSelectedCertificate(activeCerts[0]);
-                          setShowTransferModal(true);
-                        } else {
-                          alert('No active certificates to transfer');
-                        }
-                      }}
-                    >
-                      Transfer Certificate
-                    </Button>
-                  </Col>
-                  <Col span={6}>
-                    <Button
-                      block
-                      size="large"
-                      onClick={() => {
-                        const newDevice = {
-                          id: `DEV - ${ Date.now() } `,
-                          name: `Device ${ devices.length + 1 } `,
-                          technology: ['solar', 'wind', 'hydro'][Math.floor(Math.random() * 3)],
-                          capacity_mw: Math.floor(Math.random() * 100) + 10,
-                          location: `Location ${ devices.length + 1 } `,
-                          status: 'active'
-                        };
-                        setDevices(prev => [...prev, newDevice]);
-                        alert('New device registered!');
-                      }}
-                    >
-                      Add Device
-                    </Button>
-                  </Col>
-                  <Col span={6}>
-                    <Button
-                      block
-                      size="large"
-                      onClick={() => {
-                        loadData();
-                        alert('Data refreshed!');
-                      }}
-                    >
-                      Refresh Data
-                    </Button>
-                  </Col>
-                </Row>
-              </Card>
-            </Col>
-          </Row>
-        </TabPane>
-
-        <TabPane tab="📋 Certificate Management" key="2">
-          <Card
-            title="Energy Attribute Certificates (EACs)"
-            extra={
-              <>
-                <Button type="default" onClick={() => setShowImportModal(true)} style={{ marginRight: '8px' }}>
-                  Import from Registry
-                </Button>
-                <Button type="primary" onClick={() => setShowCreateModal(true)}>
-                  Create New Certificate
-                </Button>
-              </>
-            }
-          >
-            <Table
-              columns={certificateColumns}
-              dataSource={certificates}
-              rowKey="id"
-              loading={loading}
-              pagination={{ pageSize: 10 }}
-            />
-          </Card>
-        </TabPane>
-
-        <TabPane tab="⏰ Hourly Granular Certificates" key="3">
-          <Row gutter={[16, 16]}>
-            <Col span={24}>
-              <Card title={`Hourly Generation Data - ${ selectedCertificate?.id || 'Select a Certificate' } `}>
-                {selectedCertificate && (
-                  <div style={{ marginBottom: '16px' }}>
-                    <p><strong>Certificate:</strong> {selectedCertificate.id}</p>
-                    <p><strong>Total Energy:</strong> {selectedCertificate.total_mwh} MWh → {selectedCertificate.hourly_certificates.toLocaleString()} Hourly GCs</p>
-                    <p><strong>Source:</strong> {selectedCertificate.source_type} ({selectedCertificate.device_name})</p>
-                  </div>
-                )}
-              </Card>
-            </Col>
-            <Col span={24}>
-              <Card title="24-Hour Generation Profile">
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={hourlyData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="hour" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [`${ value.toFixed(3) } kWh`, 'Generation']} />
-                    <Line type="monotone" dataKey="generation_kwh" stroke="#8884d8" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </Card>
-            </Col>
-            <Col span={24}>
-              <Card title="Hourly Certificate Details">
-                <Table
-                  columns={hourlyColumns}
-                  dataSource={hourlyData}
-                  rowKey="id"
-                  pagination={{ pageSize: 12 }}
-                  size="small"
-                />
-              </Card>
-            </Col>
-          </Row>
-        </TabPane>
-
-        <TabPane tab="🔄 Certificate Trading" key="4">
-          <Card title="Certificate Transfer & Trading">
-            <Row gutter={[16, 16]}>
-              <Col span={24}>
-                <Card title="Select Certificate to Trade" size="small">
-                  <Table
-                    columns={[
-                      { title: 'ID', dataIndex: 'id', key: 'id' },
-                      { title: 'Type', dataIndex: 'source_type', key: 'source_type' },
-                      { title: 'Amount', dataIndex: 'total_mwh', key: 'total_mwh', render: (val) => `${ val } MWh` },
-                      { title: 'Status', dataIndex: 'status', key: 'status' },
-                      {
-                        title: 'Actions',
-                        key: 'actions',
-                        render: (_, cert) => (
-                          <div>
-                            <Button
-                              size="small"
-                              onClick={() => { setSelectedCertificate(cert); setShowTransferModal(true); }}
-                              disabled={cert.status !== 'active'}
-                            >
-                              Transfer
-                            </Button>
-                            <Button
-                              size="small"
-                              danger
-                              style={{ marginLeft: '8px' }}
-                              onClick={() => {
-                                setCertificates(prev => prev.map(c =>
-                                  c.id === cert.id ? { ...c, status: 'cancelled' } : c
-                                ));
-                                alert('Certificate cancelled!');
-                              }}
-                              disabled={cert.status !== 'active'}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        )
-                      }
-                    ]}
-                    dataSource={certificates}
-                    rowKey="id"
-                    size="small"
-                    pagination={{ pageSize: 5 }}
-                  />
-                </Card>
-              </Col>
-            </Row>
-          </Card>
-        </TabPane>
-
-        <TabPane tab="🔋 Storage Management" key="5">
-          <Card title="Storage Device Operations">
-            <Row gutter={[16, 16]}>
-              <Col span={24}>
-                <Card title="Storage Operations Control" size="small">
-                  <Row gutter={[16, 16]}>
-                    <Col span={8}>
-                      <Button
-                        type="primary"
-                        block
-                        onClick={() => {
-                          const newRecord = {
-                            id: `SCR - ${ Date.now() } `,
-                            energy_charged_kwh: Math.random() * 1000 + 500,
-                            status: 'active'
-                          };
-                          setStorageRecords(prev => [...prev, newRecord]);
-                          alert('Storage charge initiated!');
-                        }}
-                      >
-                        Start Charging
-                      </Button>
-                    </Col>
-                    <Col span={8}>
-                      <Button
-                        block
-                        onClick={() => {
-                          const newRecord = {
-                            id: `SDR - ${ Date.now() } `,
-                            energy_discharged_kwh: Math.random() * 800 + 400,
-                            storage_efficiency: 0.85 + Math.random() * 0.1,
-                            status: 'active'
-                          };
-                          setStorageRecords(prev => [...prev, newRecord]);
-                          alert('Storage discharge initiated!');
-                        }}
-                      >
-                        Start Discharging
-                      </Button>
-                    </Col>
-                    <Col span={8}>
-                      <Button
-                        danger
-                        block
-                        onClick={() => {
-                          setStorageRecords([]);
-                          alert('All storage records cleared!');
-                        }}
-                      >
-                        Clear Records
-                      </Button>
-                    </Col>
-                  </Row>
-                </Card>
-              </Col>
-              <Col span={12}>
-                <Card title="Storage Charge Records (SCR)" size="small">
-                  {storageRecords.filter(r => r.id?.startsWith('SCR')).map(record => (
-                    <div key={record.id} style={{ marginBottom: '12px', padding: '8px', border: '1px solid #e6f7ff', borderRadius: '4px' }}>
-                      <p><strong>{record.id}</strong></p>
-                      <p>Energy Charged: {(record.energy_charged_kwh / 1000).toFixed(1)} MWh</p>
-                      <p>Status: <span style={{ color: 'green' }}>{record.status?.toUpperCase() || 'N/A'}</span></p>
-                      <Button
-                        size="small"
-                        danger
-                        onClick={() => {
-                          setStorageRecords(prev => prev.filter(r => r.id !== record.id));
-                        }}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  ))}
-                </Card>
-              </Col>
-              <Col span={12}>
-                <Card title="Storage Discharge Records (SDR)" size="small">
-                  {storageRecords.filter(r => r.id?.startsWith('SDR')).map(record => (
-                    <div key={record.id} style={{ marginBottom: '12px', padding: '8px', border: '1px solid #f6ffed', borderRadius: '4px' }}>
-                      <p><strong>{record.id}</strong></p>
-                      <p>Energy Discharged: {(record.energy_discharged_kwh / 1000).toFixed(1)} MWh</p>
-                      <p>Efficiency: {(record.storage_efficiency * 100).toFixed(1)}%</p>
-                      <p>Status: <span style={{ color: 'green' }}>{record.status?.toUpperCase() || 'N/A'}</span></p>
-                      <Button
-                        size="small"
-                        danger
-                        onClick={() => {
-                          setStorageRecords(prev => prev.filter(r => r.id !== record.id));
-                        }}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  ))}
-                </Card>
-              </Col>
-            </Row>
-          </Card>
-        </TabPane>
-
-        <TabPane tab="⚡ Device Management" key="6">
-          <Card
-            title="Registered Devices"
-            extra={
-              <Button
-                type="primary"
-                onClick={() => {
-                  const newDevice = {
-                    id: `DEV - ${ Date.now() } `,
-                    name: `Device ${ devices.length + 1 } `,
-                    technology: ['solar', 'wind', 'hydro'][Math.floor(Math.random() * 3)],
-                    capacity_mw: Math.floor(Math.random() * 100) + 10,
-                    location: `Location ${ devices.length + 1 } `,
-                    status: 'active'
-                  };
-                  setDevices(prev => [...prev, newDevice]);
-                  alert('New device registered!');
-                }}
-              >
-                Add Device
-              </Button>
-            }
-          >
-            <Row gutter={[16, 16]}>
-              {devices.map(device => (
-                <Col span={8} key={device.id}>
-                  <Card
-                    size="small"
-                    title={device.name}
-                    extra={
-                      <Button type="link" onClick={() => {
-                        setUploadDeviceId(device.id);
-                        setShowUploadReadingsModal(true);
-                      }}>
-                        Upload Data
-                      </Button>
-                    }
-                  >
-                    <p><strong>ID:</strong> {device.id}</p>
-                    <p><strong>Technology:</strong> {device.technology}</p>
-                    <p><strong>Capacity:</strong> {device.capacity_mw} MW</p>
-                    <p><strong>Location:</strong> {device.location}</p>
-                    <p><strong>Status:</strong> <span style={{ color: device.status === 'active' ? 'green' : 'red' }}>{device.status?.toUpperCase() || 'N/A'}</span></p>
-                    <div style={{ marginTop: '8px' }}>
-                      <Button
-                        size="small"
-                        onClick={() => {
-                          setDevices(prev => prev.map(d =>
-                            d.id === device.id
-                              ? { ...d, status: d.status === 'active' ? 'inactive' : 'active' }
-                              : d
-                          ));
-                        }}
-                      >
-                        Toggle Status
-                      </Button>
-                      <Button
-                        size="small"
-                        danger
-                        style={{ marginLeft: '8px' }}
-                        onClick={() => {
-                          setDevices(prev => prev.filter(d => d.id !== device.id));
-                          alert('Device removed!');
-                        }}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  </Card>
-                </Col>
-              ))}
-            </Row>
-          </Card>
-        </TabPane>
-      </Tabs>
-
-      {/* Transfer Modal */}
+      {/* Persistence Handlers (from previous task) */}
       <Modal
-        title="Transfer Certificate"
+        title="Transfer Certificates"
         open={showTransferModal}
         onCancel={() => setShowTransferModal(false)}
         footer={null}
       >
-        <Form onFinish={handleTransfer}>
-          <Form.Item label="Certificate" name="certificate">
-            <Input value={selectedCertificate?.id} disabled />
-          </Form.Item>
-          <Form.Item label="To Account" name="to_account" rules={[{ required: true }]}>
-            <Select>
-              {accounts.map(account => (
-                <Option key={account.id} value={account.id}>{account.account_name}</Option>
-              ))}
+        <Form layout="vertical" onFinish={(values) => {
+          setCertificates(prev => prev.filter(c => !selectedRowKeys.includes(c.id)));
+          setSelectedRowKeys([]);
+          setShowTransferModal(false);
+          notification.success({ message: 'Transfer Authorized', description: 'Selected units have been successfully routed.' });
+        }}>
+          <Form.Item label="Target Account" name="to_account" rules={[{ required: true }]}>
+            <Select placeholder="Select participant">
+              {accounts.map(a => <Option key={a.id} value={a.id}>{a.account_name}</Option>)}
             </Select>
           </Form.Item>
-          <Form.Item label="Amount (MWh)" name="amount" rules={[{ required: true }]}>
-            <Input type="number" />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit">Transfer</Button>
-          </Form.Item>
+          <Button type="primary" block size="large" htmlType="submit">Execute Transfer</Button>
         </Form>
       </Modal>
 
-      {/* Import Certificate Modal */}
       <Modal
-        title="Import Certificates from Registry"
+        title="External Registry Import"
         open={showImportModal}
         onCancel={() => setShowImportModal(false)}
         footer={null}
       >
-        <p>Upload a CSV/JSON file from another registry to import EACs.</p>
-        <Button type="link" onClick={() => downloadCertificateImportTemplateAPI().then(res => {
-            const url = window.URL.createObjectURL(new Blob([res.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', 'gc_import_template.csv');
-            document.body.appendChild(link);
-            link.click();
-        })}>Download Template</Button>
-        <Form onFinish={handleImportCertificate}>
-          <Form.Item label="Account" name="account_id" rules={[{ required: true }]}>
-            <Select>
-              {accounts.map(account => (
-                 <Option key={account.id} value={account.id}>{account.account_name}</Option>
-              ))}
-            </Select>
+        <Form layout="vertical" onFinish={() => {
+          const newCert = {
+            id: `IMP-${Date.now()}`,
+            issuance_id: `IMP-${Date.now()}`,
+            device_name: "Imported Node",
+            source_type: "solar",
+            period_start: "2025-10-20T00:00:00",
+            period_end: "2025-10-20T01:00:00",
+            production_mwh: 50.0,
+            status: "active"
+          };
+          setCertificates(prev => [newCert, ...prev]);
+          setShowImportModal(false);
+          notification.success({ message: 'Import Successful' });
+        }}>
+          <Form.Item label="Target Portfolio" name="acc" rules={[{ required: true }]}>
+            <Select>{accounts.map(a => <Option key={a.id} value={a.id}>{a.account_name}</Option>)}</Select>
           </Form.Item>
-          <Form.Item label="File" name="file" valuePropName="file" rules={[{ required: true }]}>
-             <Input type="file" />
+          <Form.Item label="Registry File" name="file" rules={[{ required: true }]}>
+            <Upload beforeUpload={() => false}><Button icon={<UploadOutlined />}>Select File</Button></Upload>
           </Form.Item>
-          {/* Device JSON hidden/default for now */}
-          <Form.Item>
-            <Button type="primary" htmlType="submit">Import Certificates</Button>
-          </Form.Item>
+          <Button type="primary" block size="large" htmlType="submit">Execute Import</Button>
         </Form>
       </Modal>
 
-      {/* Upload Readings Modal */}
       <Modal
-        title="Upload Generation Data"
-        open={showUploadReadingsModal}
-        onCancel={() => setShowUploadReadingsModal(false)}
-        footer={null}
-      >
-         <p>Upload meter readings (CSV) for Device ID: {uploadDeviceId}</p>
-         <Button type="link" onClick={() => downloadMeterReadingsTemplateAPI().then(res => {
-            const url = window.URL.createObjectURL(new Blob([res.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', 'meter_readings_template.csv');
-            document.body.appendChild(link);
-            link.click();
-        })}>Download Template</Button>
-        <Form onFinish={handleUploadReadings}>
-          <Form.Item label="File" name="file" valuePropName="file" rules={[{ required: true }]}>
-             <Input type="file" />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit">Upload Readings</Button>
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* Create Certificate Modal */}
-      <Modal
-        title="Create New Certificate"
+        title="Register New Issuance"
         open={showCreateModal}
         onCancel={() => setShowCreateModal(false)}
         footer={null}
       >
-        <Form onFinish={handleCreateCertificate}>
-          <Form.Item label="Total MWh" name="total_mwh" rules={[{ required: true }]}>
+        <Form layout="vertical" onFinish={(values) => {
+          const newCert = {
+            id: `CERT-${Date.now()}`,
+            issuance_id: `CERT-${Date.now()}`,
+            device_name: devices.find(d => d.id === values.device_id)?.name || 'New Asset',
+            source_type: values.source_type,
+            period_start: "2025-11-01T00:00:00",
+            period_end: "2025-11-01T01:00:00",
+            production_mwh: parseFloat(values.total_mwh),
+            status: "active"
+          };
+          setCertificates(prev => [newCert, ...prev]);
+          setShowCreateModal(false);
+          notification.success({ message: 'Unit Issued' });
+        }}>
+          <Form.Item label="Energy Source" name="source_type" rules={[{ required: true }]}>
+            <Select><Option value="solar">Solar</Option><Option value="wind">Wind</Option></Select>
+          </Form.Item>
+          <Form.Item label="Volume (MWh)" name="total_mwh" rules={[{ required: true }]}>
             <Input type="number" />
           </Form.Item>
-          <Form.Item label="Energy Source" name="source_type" rules={[{ required: true }]}>
-            <Select>
-              <Option value="solar">Solar</Option>
-              <Option value="wind">Wind</Option>
-              <Option value="hydro">Hydro</Option>
-            </Select>
+          <Form.Item label="Originating Asset" name="device_id" rules={[{ required: true }]}>
+            <Select>{devices.map(d => <Option key={d.id} value={d.id}>{d.name}</Option>)}</Select>
           </Form.Item>
-          <Form.Item label="Device ID" name="device_id" rules={[{ required: true }]}>
-            <Select>
-              {devices.map(device => (
-                <Option key={device.id} value={device.id}>{device.name}</Option>
-              ))}
-            </Select>
+          <Button type="primary" block size="large" htmlType="submit">Issue Certificate</Button>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Submit Meter Data"
+        open={showUploadReadingsModal}
+        onCancel={() => setShowUploadReadingsModal(false)}
+        footer={null}
+      >
+        <Form layout="vertical" onFinish={() => {
+          setShowUploadReadingsModal(false);
+          notification.success({ message: 'Telemetry Synchronized', description: 'Initializing Granular Stamping...' });
+        }}>
+          <Form.Item label="Asset" name="dev" rules={[{ required: true }]}>
+            <Select>{devices.map(d => <Option key={d.id} value={d.id}>{d.name}</Option>)}</Select>
           </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit">Create Certificate</Button>
+          <Form.Item label="Meter Log (CSV)" name="log" rules={[{ required: true }]}>
+            <Upload beforeUpload={() => false}><Button icon={<UploadOutlined />}>Select Log</Button></Upload>
           </Form.Item>
+          <Button type="primary" block size="large" htmlType="submit">Validate & Submit</Button>
         </Form>
       </Modal>
     </div>

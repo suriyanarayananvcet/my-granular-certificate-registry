@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     MIDDLEWARE_SECRET_KEY: str = "secret_key"
 
     LOG_LEVEL: str = "INFO"
+    CORS_ALLOWED_ORIGINS: str = ""
 
     CERTIFICATE_GRANULARITY_HOURS: float = 1.0
     CAPACITY_MARGIN: float = 1.1

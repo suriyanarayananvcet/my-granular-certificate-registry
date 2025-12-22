@@ -123,6 +123,9 @@ origins = [
     "http://localhost:3000",
 ]
 
+if settings.CORS_ALLOWED_ORIGINS:
+    origins.extend([o.strip() for o in settings.CORS_ALLOWED_ORIGINS.split(",")])
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,

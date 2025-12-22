@@ -73,71 +73,43 @@ baseAPI.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Check for demo mode in localStorage or environment
+const isDemoEnabled = () => {
+  return localStorage.getItem('demo_mode') === 'true' || DEMO_MODE;
+};
+
 baseAPI.interceptors.response.use(
   (response) => response,
   async (error) => {
     console.error(error);
+    const url = error.config?.url;
+    const isDemo = isDemoEnabled();
 
-    // Demo mode fallback for all errors
-    if (DEMO_MODE && (error.code === "ERR_NETWORK" || error.code === "DEMO_MODE" || !error.response)) {
-      const url = error.config?.url;
-      if (url?.includes("/auth/login")) {
-        return mockLogin();
-      }
-      if (url?.includes("/certificate")) {
-        return mockCertificates();
-      }
-      if (url?.includes("/hourly")) {
-        return mockHourlyData();
-      }
-      if (url?.includes("/user/me")) {
-        return mockUserMe();
-      }
-      if (url?.includes("/account")) {
-        return mockAccounts();
-      }
-      if (url?.includes("/device")) {
-        return mockDevices();
-      }
-      if (url?.includes("/storage")) {
-        return mockStorageRecords();
-      }
-      if (url?.includes("/transfer")) {
-        return mockTransferCertificate();
-      }
-      if (url?.includes("/create")) {
-        return mockCreateCertificate();
-      }
+    // Demo mode fallback for all errors (Network, 401, 403, 500)
+    if (isDemo && (error.code === "ERR_NETWORK" || error.response?.status === 401 || error.response?.status === 403 || error.response?.status >= 500)) {
+      console.log(`Demo Mode: Intercepted ${error.response?.status || 'Network'} error for ${url}. Returning mock data.`);
+
+      if (url?.includes("/auth/login")) return mockLogin();
+      if (url?.includes("/certificate")) return mockCertificates();
+      if (url?.includes("/hourly")) return mockHourlyData();
+      if (url?.includes("/user/me")) return mockUserMe();
+      if (url?.includes("/account")) return mockAccounts();
+      if (url?.includes("/device")) return mockDevices();
+      if (url?.includes("/storage")) return mockStorageRecords();
+      if (url?.includes("/transfer")) return mockTransferCertificate();
+      if (url?.includes("/create")) return mockCreateCertificate();
     }
 
-    // In demo mode, don't redirect on errors
-    if (!DEMO_MODE) {
-      // Check for a network error
-      if (
-        (error.code === "ERR_NETWORK" || !error.response) &&
-        window.location.pathname !== "/login"
-      ) {
-        // Redirect to login on network error
+    // Standard redirect logic (only if not in demo mode)
+    if (!isDemo) {
+      if ((error.code === "ERR_NETWORK" || !error.response || error.response?.status === 401) && window.location.pathname !== "/login") {
         window.location.href = "/login";
         return Promise.reject(error);
       }
     }
 
-    if (
-      error.response?.status === 403 &&
-      error.response?.data?.detail?.includes("CSRF")
-    ) {
-      const newToken = await fetchCSRFToken();
-      if (newToken && error.config) {
-        error.config.headers["X-CSRF-Token"] = newToken;
-        return baseAPI(error.config);
-      }
-    }
-
     const status = error.response?.status || 500;
-    const message =
-      error.response?.data?.detail || "An unexpected error occurred.";
-
+    const message = error.response?.data?.detail || "An unexpected error occurred.";
     return Promise.reject({ status, message });
   }
 );
