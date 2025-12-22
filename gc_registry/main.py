@@ -116,40 +116,38 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             admin_email = "admin@registry.com"
             logger.info(f"🔍 Checking for admin user: {admin_email}")
             
-            with get_read_session() as read_session:
-                admin = read_session.exec(select(User).where(User.email == admin_email)).first()
-            
-            if admin:
-                logger.info(f"✅ Verified: {admin_email} exists in database.")
-            else:
-                logger.info(f"🌱 Seeding missing admin user: {admin_email}")
-                
-                # Handle optional ESDB with a strict timeout/safety
-                esdb_client = None
-                try:
-                    logger.info("Connecting to EventStoreDB (optional)...")
-                    esdb_client = events.get_esdb_client()
-                    logger.info("Connected to EventStoreDB.")
-                except Exception as e:
-                    logger.warning(f"⚠️ EventStoreDB not available ({str(e)}), skipping event logging for seeding.")
-                    esdb_client = None
+                # CRITICAL: Use ONE session for both read/write during seeding to avoid deadlocks
+                # in single-DB environments like Railway.
+                with get_write_session() as session:
+                    logger.info("Database session opened for seeding.")
                     
-                logger.info("Generating password hash...")
-                hashed_pw = get_password_hash("admin123")
-                logger.info("Password hash generated.")
-                
-                admin_user_dict = {
-                    "email": admin_email,
-                    "name": "Production Admin",
-                    "hashed_password": hashed_pw,
-                    "role": UserRoles.ADMIN,
-                }
-                
-                logger.info("Writing admin user to database...")
-                with get_write_session() as write_session:
-                    with get_read_session() as read_session:
-                        User.create(admin_user_dict, write_session, read_session, esdb_client)
-                logger.info(f"✅ Created: {admin_email} successfully.")
+                    # Check if admin exists using the same session
+                    admin = session.exec(select(User).where(User.email == admin_email)).first()
+                    
+                    if admin:
+                        logger.info(f"✅ Verified: {admin_email} exists in database.")
+                    else:
+                        logger.info(f"🌱 Seeding missing admin user: {admin_email}")
+                        
+                        # Explicitly disable ESDB for startup seeding to avoid networking hangs
+                        esdb_client = None
+                        logger.info("EventStoreDB disabled for startup seeding for safety.")
+                            
+                        logger.info("Generating password hash...")
+                        hashed_pw = get_password_hash("admin123")
+                        logger.info("Password hash generated.")
+                        
+                        admin_user_dict = {
+                            "email": admin_email,
+                            "name": "Production Admin",
+                            "hashed_password": hashed_pw,
+                            "role": UserRoles.ADMIN,
+                        }
+                        
+                        logger.info("Writing admin user to database (using single session)...")
+                        # Pass the same session to both read/write session arguments
+                        User.create(admin_user_dict, session, session, esdb_client)
+                        logger.info(f"✅ Created: {admin_email} successfully.")
                 
         except Exception as seed_err:
             logger.error(f"❌ Critical error during startup seeding: {str(seed_err)}")
