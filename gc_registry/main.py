@@ -205,6 +205,29 @@ openapi_data = app.openapi()
 templates = Jinja2Templates(directory=STATIC_DIR_FP / "templates")
 
 
+@app.get("/debug/env", tags=["Core"])
+async def debug_env():
+    """Diagnostic endpoint to see what variables are reaching the container."""
+    # Only allow in non-PROD or with a specific flag if possible
+    # For now, we need this to see why Railway is failing
+    env_data = {}
+    for k, v in os.environ.items():
+        if any(secret in k.upper() for secret in ["KEY", "PASS", "SECRET", "URL", "TOKEN"]):
+            # Mask sensitive values
+            if len(v) > 8:
+                env_data[k] = f"{v[:4]}...{v[-4:]}"
+            else:
+                env_data[k] = "****"
+        else:
+            env_data[k] = v
+    
+    return {
+        "environment_vars": env_data,
+        "settings_db_url_is_none": settings.DATABASE_URL is None,
+        "settings_env": settings.ENVIRONMENT
+    }
+
+
 @app.get("/", response_class=HTMLResponse, tags=["Core"])
 async def read_root(request: Request):
     params = {
