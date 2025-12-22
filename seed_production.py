@@ -16,51 +16,44 @@ def seed():
         # Get database connections using the actual application logic
         from gc_registry.core.database.db import get_write_session, get_read_session
         
-        write_gen = get_write_session()
-        write_session = next(write_gen)
-        
-        read_gen = get_read_session()
-        read_session = next(read_gen)
-        
-        # We might not have ESDB in production yet
-        try:
-            esdb_client = events.get_esdb_client()
-        except Exception:
-            print("⚠️ EventStoreDB not available, skipping event logging for seeding.", flush=True)
-            esdb_client = None
-        
-        admin_email = "admin@registry.com"
-        admin_pass = "admin123"
-        
-        print(f"Checking if user {admin_email} exists...", flush=True)
-        
-        # Check if admin already exists
-        existing_admin = read_session.exec(
-            select(User).where(User.email == admin_email)
-        ).first()
-        
-        if existing_admin:
-            print(f"✅ User {admin_email} already exists.", flush=True)
-        else:
-            print(f"Creating user {admin_email}...", flush=True)
-            # Create admin user
-            admin_user_dict = {
-                "email": admin_email,
-                "name": "Production Admin",
-                "hashed_password": get_password_hash(admin_pass),
-                "role": UserRoles.ADMIN,
-            }
-            
-            # This calling convention matches the app's services
-            User.create(
-                admin_user_dict, write_session, read_session, esdb_client
-            )
-            
-            # Explicitly commit just in case
-            write_session.commit()
-            read_session.commit()
-            
-            print(f"✅ User {admin_email} created successfully!", flush=True)
+        with get_write_session() as write_session:
+            with get_read_session() as read_session:
+                
+                # We might not have ESDB in production yet
+                try:
+                    esdb_client = events.get_esdb_client()
+                except Exception:
+                    print("⚠️ EventStoreDB not available, skipping event logging for seeding.", flush=True)
+                    esdb_client = None
+                
+                admin_email = "admin@registry.com"
+                admin_pass = "admin123"
+                
+                print(f"Checking if user {admin_email} exists...", flush=True)
+                
+                # Check if admin already exists
+                existing_admin = read_session.exec(
+                    select(User).where(User.email == admin_email)
+                ).first()
+                
+                if existing_admin:
+                    print(f"✅ User {admin_email} already exists.", flush=True)
+                else:
+                    print(f"Creating user {admin_email}...", flush=True)
+                    # Create admin user
+                    admin_user_dict = {
+                        "email": admin_email,
+                        "name": "Production Admin",
+                        "hashed_password": get_password_hash(admin_pass),
+                        "role": UserRoles.ADMIN,
+                    }
+                    
+                    # This calling convention matches the app's services
+                    User.create(
+                        admin_user_dict, write_session, read_session, esdb_client
+                    )
+                    
+                    print(f"✅ User {admin_email} created successfully!", flush=True)
         
     except Exception as e:
         print(f"❌ Error during seeding: {e}", flush=True)

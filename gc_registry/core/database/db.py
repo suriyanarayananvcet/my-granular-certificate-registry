@@ -163,6 +163,10 @@ def get_db_name_to_client() -> dict[str, Any]:
     return db_name_to_client
 
 
+from contextlib import contextmanager
+from typing import Any, Generator
+
+@contextmanager
 def get_session(target: str) -> Generator[Session, None, None]:
     """Helper to get a session for a specific target database."""
     # Ensure clients are initialized
@@ -179,11 +183,15 @@ def get_session(target: str) -> Generator[Session, None, None]:
             session.close()
 
 
+@contextmanager
 def get_write_session() -> Generator[Session, None, None]:
     """FastAPI dependency for a write database session."""
-    yield from get_session("db_write")
+    with get_session("db_write") as session:
+        yield session
 
 
+@contextmanager
 def get_read_session() -> Generator[Session, None, None]:
     """FastAPI dependency for a read database session."""
-    yield from get_session("db_read")
+    with get_session("db_read") as session:
+        yield session
