@@ -4,7 +4,7 @@ import {
   DashboardOutlined,
   FileProtectOutlined,
   SwapOutlined,
-  ContainerOutlined,
+  SettingOutlined,
   UserOutlined,
   LogoutOutlined,
 } from '@ant-design/icons';
@@ -165,7 +165,7 @@ function App() {
           mode="inline"
           onClick={handleMenuClick}
           items={[
-            { key: '6', icon: <ContainerOutlined />, label: 'Device management' },
+            { key: '6', icon: <SettingOutlined />, label: 'Device management' },
             { key: '1', icon: <FileProtectOutlined />, label: 'Certificates' },
             { key: '4', icon: <SwapOutlined />, label: 'Transfer History', disabled: true },
           ]}
