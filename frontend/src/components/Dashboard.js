@@ -24,8 +24,15 @@ const { RangePicker } = DatePicker;
 
 const Dashboard = ({ activeTab = "1", onTabChange }) => {
   const [certificates, setCertificates] = useState([]);
-  const [devices, setDevices] = useState([]);
-  const [accounts, setAccounts] = useState([]);
+  const [devices, setDevices] = useState([
+    { id: "SOLAR-001", name: "Solar Farm California", technology: "solar", capacity_mw: 100, location: "California", status: "active" },
+    { id: "WIND-001", name: "Wind Farm Texas", technology: "wind", capacity_mw: 150, location: "Texas", status: "active" },
+    { id: "HYDRO-001", name: "Hydro Plant Washington", technology: "hydro", capacity_mw: 200, location: "Washington", status: "active" }
+  ]);
+  const [accounts, setAccounts] = useState([
+    { id: 1, account_name: "Main Trading Account" },
+    { id: 2, account_name: "Storage Account" }
+  ]);
   const [loading, setLoading] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [showTransferModal, setShowTransferModal] = useState(false);
