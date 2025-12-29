@@ -112,42 +112,41 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             from gc_registry.authentication.services import get_password_hash
             from gc_registry.core.database import events
             from gc_registry.core.models.base import UserRoles
-            
             admin_email = "admin@registry.com"
             logger.info(f"🔍 Checking for admin user: {admin_email}")
             
-                # CRITICAL: Use ONE session for both read/write during seeding to avoid deadlocks
-                # in single-DB environments like Railway.
-                with get_write_session() as session:
-                    logger.info("Database session opened for seeding.")
+            # CRITICAL: Use ONE session for both read/write during seeding to avoid deadlocks
+            # in single-DB environments like Railway.
+            with get_write_session() as session:
+                logger.info("Database session opened for seeding.")
+                
+                # Check if admin exists using the same session
+                admin = session.exec(select(User).where(User.email == admin_email)).first()
+                
+                if admin:
+                    logger.info(f"✅ Verified: {admin_email} exists in database.")
+                else:
+                    logger.info(f"🌱 Seeding missing admin user: {admin_email}")
                     
-                    # Check if admin exists using the same session
-                    admin = session.exec(select(User).where(User.email == admin_email)).first()
+                    # Explicitly disable ESDB for startup seeding to avoid networking hangs
+                    esdb_client = None
+                    logger.info("EventStoreDB disabled for startup seeding for safety.")
+                        
+                    logger.info("Generating password hash...")
+                    hashed_pw = get_password_hash("admin123")
+                    logger.info("Password hash generated.")
                     
-                    if admin:
-                        logger.info(f"✅ Verified: {admin_email} exists in database.")
-                    else:
-                        logger.info(f"🌱 Seeding missing admin user: {admin_email}")
-                        
-                        # Explicitly disable ESDB for startup seeding to avoid networking hangs
-                        esdb_client = None
-                        logger.info("EventStoreDB disabled for startup seeding for safety.")
-                            
-                        logger.info("Generating password hash...")
-                        hashed_pw = get_password_hash("admin123")
-                        logger.info("Password hash generated.")
-                        
-                        admin_user_dict = {
-                            "email": admin_email,
-                            "name": "Production Admin",
-                            "hashed_password": hashed_pw,
-                            "role": UserRoles.ADMIN,
-                        }
-                        
-                        logger.info("Writing admin user to database (using single session)...")
-                        # Pass the same session to both read/write session arguments
-                        User.create(admin_user_dict, session, session, esdb_client)
-                        logger.info(f"✅ Created: {admin_email} successfully.")
+                    admin_user_dict = {
+                        "email": admin_email,
+                        "name": "Production Admin",
+                        "hashed_password": hashed_pw,
+                        "role": UserRoles.ADMIN,
+                    }
+                    
+                    logger.info("Writing admin user to database (using single session)...")
+                    # Pass the same session to both read/write session arguments
+                    User.create(admin_user_dict, session, session, esdb_client)
+                    logger.info(f"✅ Created: {admin_email} successfully.")
                 
         except Exception as seed_err:
             logger.error(f"❌ Critical error during startup seeding: {str(seed_err)}")

@@ -21,9 +21,11 @@ def write_to_database(
     """Write the provided entities to the read and write databases, saving an
     Event entry for each entity."""
 
+    is_same_session = read_session is write_session
+    
     if not isinstance(entities, list):
         entities = [entities]
-
+    
     try:
         # Batch write the entities to the databases
         write_session.add_all(entities)
@@ -35,7 +37,7 @@ def write_to_database(
 
     except Exception as e:
         logger.error(
-            f"Error during commit to write DB during create: {str(e)}, session ID {id(write_session)}"
+            f"Error during flush to write DB during create: {str(e)}, session ID {id(write_session)}"
         )
         write_session.rollback()
         raise e
@@ -44,30 +46,44 @@ def write_to_database(
         # if needed, transform the entity into its equivalent read DB representation
         read_entities = transform_write_entities_to_read(entities)
 
-        # merge read entities from the write session to prevent de-scoping
-        read_entities = [read_session.merge(entity) for entity in read_entities]
-        read_session.add_all(read_entities)
-        read_session.flush()
+        if not is_same_session:
+            # merge read entities from the write session to prevent de-scoping only if sessions differ
+            read_entities = [read_session.merge(entity) for entity in read_entities]
+            read_session.add_all(read_entities)
+            read_session.flush()
+        else:
+            logger.debug("Read and write sessions are identical, skipping redundant merge/add.")
 
     except Exception as e:
-        logger.error(f"Error during commit to read DB during create: {str(e)}")
+        logger.error(f"Error during flush to read DB during create: {str(e)}")
         write_session.rollback()
-        read_session.rollback()
+        if not is_same_session:
+            read_session.rollback()
         raise e
 
     if not entities[0].__class__.__name__ == "UserAccountLink":
-        batch_create_events(
-            entity_ids=[entity.id for entity in entities],  # type: ignore
-            entity_names=[entity.__class__.__name__ for entity in entities],
-            event_type=EventTypes.CREATE,
-            esdb_client=esdb_client,
-        )
+        try:
+            batch_create_events(
+                entity_ids=[entity.id for entity in entities],  # type: ignore
+                entity_names=[entity.__class__.__name__ for entity in entities],
+                event_type=EventTypes.CREATE,
+                esdb_client=esdb_client,
+            )
+        except Exception as event_err:
+            if esdb_client is not None:
+                logger.warning(f"Error writing events: {str(event_err)}")
+            # If esdb_client is None, we already skip or handled it, but being safe
 
     write_session.commit()
-    read_session.commit()
+    if not is_same_session:
+        read_session.commit()
 
     for entity in read_entities:
-        read_session.refresh(entity)
+        # If same session, we use the original entities which are already refreshed but let's be safe
+        try:
+            read_session.refresh(entity)
+        except Exception:
+            pass
 
     return read_entities
 

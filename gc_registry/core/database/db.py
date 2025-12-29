@@ -59,12 +59,19 @@ class DButils:
             source = None
 
             for var in env_vars:
-                # Prioritize direct os.getenv to bypass any Pydantic caching/loading issues
                 val = os.getenv(var)
                 if val:
                     self.connection_str = val
                     source = f"env:{var}"
                     break
+            
+            if not self.connection_str:
+                # Log that we are missing the main env vars
+                try:
+                    from gc_registry.logging_config import logger
+                    logger.warning(f"⚠️ None of {env_vars} found in environment. Falling back.")
+                except Exception:
+                    pass
             
             if not self.connection_str:
                 setting_vals = [settings.DATABASE_URL, settings.DATABASE_PRIVATE_URL, settings.POSTGRES_URL]
