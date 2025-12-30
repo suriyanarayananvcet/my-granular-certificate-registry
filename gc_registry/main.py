@@ -108,19 +108,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         try:
             from sqlmodel import select
             from gc_registry.user.models import User
-            from gc_registry.core.database.db import get_read_session, get_write_session
+            from gc_registry.core.database.db import get_db_name_to_client
             from gc_registry.authentication.services import get_password_hash
             from gc_registry.core.database import events
             from gc_registry.core.models.base import UserRoles
             admin_email = "admin@registry.com"
             logger.info(f"🔍 Checking for admin user: {admin_email}")
             
-            # CRITICAL: Use ONE session for both read/write during seeding to avoid deadlocks
-            # in single-DB environments like Railway.
-            with get_write_session() as session:
+            # Get database clients directly
+            clients = get_db_name_to_client()
+            db_client = clients["db_write"]
+            
+            # Use direct session creation instead of dependency injection
+            with db_client.get_session() as session:
                 logger.info("Database session opened for seeding.")
                 
-                # Check if admin exists using the same session
+                # Check if admin exists
                 admin = session.exec(select(User).where(User.email == admin_email)).first()
                 
                 if admin:
@@ -143,10 +146,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                         "role": UserRoles.ADMIN,
                     }
                     
-                    logger.info("Writing admin user to database (using single session)...")
-                    # Pass the same session to both read/write session arguments
+                    logger.info("Writing admin user to database...")
+                    # Use the same session for both read and write
                     User.create(admin_user_dict, session, session, esdb_client)
-                    logger.info(f"✅ Created: {admin_email} successfully.")
+                    session.commit()
+                    session.commit()
                 
         except Exception as seed_err:
             logger.error(f"❌ Critical error during startup seeding: {str(seed_err)}")
