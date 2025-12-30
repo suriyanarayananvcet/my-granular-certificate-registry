@@ -131,7 +131,7 @@ function App() {
         </div>
         <div className="login-visual-side">
           <div style={{ position: 'absolute', top: '40px', right: '40px', textAlign: 'right', color: 'white' }}>
-            <Title level={3} style={{ color: 'white', margin: 0, letterSpacing: '1px' }}>Granular CertOS</Title>
+            <Title level={3} style={{ color: 'white', margin: 0, letterSpacing: '1px' }}>🏔️ Mt.Stonegate</Title>
           </div>
           {/* Visual abstract blobs handled in CSS via radial gradients */}
         </div>
@@ -155,8 +155,8 @@ function App() {
           padding: '0 24px',
           color: '#1890ff',
         }}>
-          {!collapsed && <span style={{ fontWeight: 700, fontSize: '18px' }}>Granular CertOS</span>}
-          {collapsed && <span style={{ fontWeight: 700, fontSize: '14px' }}>GC</span>}
+          {!collapsed && <span style={{ fontWeight: 700, fontSize: '18px' }}>🏔️ Mt.Stonegate</span>}
+          {collapsed && <span style={{ fontWeight: 700, fontSize: '14px' }}>🏔️</span>}
         </div>
 
         <Menu
