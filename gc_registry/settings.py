@@ -44,15 +44,7 @@ class Settings(BaseSettings):
     def cors_origins(self) -> list[str]:
         """Parse CORS origins into a clean list."""
         if not self.CORS_ALLOWED_ORIGINS:
-            return []
-        return [
-            o.strip().strip("'\"").rstrip("/") 
-            for o in self.CORS_ALLOWED_ORIGINS.split(",") 
-            if o.strip()
-        ]
-        """Parse CORS origins into a clean list."""
-        if not self.CORS_ALLOWED_ORIGINS:
-            return []
+            return ["https://mt-stonegate.vercel.app", "http://localhost:3000"]
         return [
             o.strip().strip("'\"").rstrip("/") 
             for o in self.CORS_ALLOWED_ORIGINS.split(",") 
