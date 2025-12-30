@@ -190,15 +190,31 @@ def get_session(target: str) -> Generator[Session, None, None]:
             session.close()
 
 
-@contextmanager
 def get_write_session() -> Generator[Session, None, None]:
     """FastAPI dependency for a write database session."""
-    with get_session("db_write") as session:
-        yield session
+    clients = get_db_name_to_client()
+    
+    if "db_write" not in clients:
+        raise KeyError(f"Database client 'db_write' not found. Initialized clients: {list(clients.keys())}")
+        
+    engine = clients["db_write"].engine
+    with Session(engine) as session:
+        try:
+            yield session
+        finally:
+            session.close()
 
 
-@contextmanager
 def get_read_session() -> Generator[Session, None, None]:
     """FastAPI dependency for a read database session."""
-    with get_session("db_read") as session:
-        yield session
+    clients = get_db_name_to_client()
+    
+    if "db_read" not in clients:
+        raise KeyError(f"Database client 'db_read' not found. Initialized clients: {list(clients.keys())}")
+        
+    engine = clients["db_read"].engine
+    with Session(engine) as session:
+        try:
+            yield session
+        finally:
+            session.close()
