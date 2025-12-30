@@ -20,7 +20,7 @@ const AUTH_LIST = ["/auth/login"];
 const CSRF_EXEMPT = ["/csrf-token"];
 
 const baseAPI = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "http://localhost:8000",
+  baseURL: "https://my-granular-certificate-registry-production.up.railway.app",
   headers: {
     "Content-Type": "application/json",
   },
@@ -85,8 +85,8 @@ baseAPI.interceptors.response.use(
     const url = error.config?.url;
     const isDemo = isDemoEnabled();
 
-    // Demo mode fallback for all errors (Network, 401, 403, 500)
-    if (isDemo && (error.code === "ERR_NETWORK" || error.response?.status === 401 || error.response?.status === 403 || error.response?.status >= 500)) {
+    // Demo mode fallback for network errors only
+    if (isDemo && error.code === "ERR_NETWORK") {
       console.log(`Demo Mode: Intercepted ${error.response?.status || 'Network'} error for ${url}. Returning mock data.`);
 
       if (url?.includes("/auth/login")) return mockLogin();

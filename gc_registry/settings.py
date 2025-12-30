@@ -6,10 +6,16 @@ class Settings(BaseSettings):
 
     ENVIRONMENT: str = "LOCAL"
     
-    # Database URLs (Railway / Cloud)
-    DATABASE_URL: str | None = os.getenv("DATABASE_URL")
-    DATABASE_PRIVATE_URL: str | None = os.getenv("DATABASE_PRIVATE_URL")
-    POSTGRES_URL: str | None = os.getenv("POSTGRES_URL")
+    # Database URLs (Railway / Cloud) - Build from components if not provided
+    DATABASE_URL: str | None = None
+    DATABASE_PRIVATE_URL: str | None = None
+    POSTGRES_URL: str | None = None
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Build DATABASE_URL from components if not provided
+        if not self.DATABASE_URL and not self.DATABASE_PRIVATE_URL and not self.POSTGRES_URL:
+            self.DATABASE_URL = f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     # Fallback/Manual Configuration - Prioritize Railway names if available
     POSTGRES_HOST: str = os.getenv("DATABASE_HOST_WRITE", os.getenv("POSTGRES_HOST", "127.0.0.1"))
