@@ -12,7 +12,7 @@ import {
   CloseCircleOutlined,
   LockOutlined,
 } from '@ant-design/icons';
-import { fetchCertificatesAPI, importCertificatesAPI, transferCertificateAPI } from '../api/certificateAPI';
+import { fetchCertificatesAPI, importCertificatesAPI, transferCertificateAPI, createCertificateAPI } from '../api/certificateAPI';
 import { submitReadingsAPI } from '../api/measurementAPI';
 import { readCurrentUserAPI } from '../api/userAPI';
 import { getAccountDevicesAPI } from '../api/accountAPI';
@@ -284,18 +284,30 @@ const Dashboard = ({ activeTab = "1", onTabChange }) => {
         onCancel={() => setShowTransferModal(false)}
         footer={null}
       >
-        <Form layout="vertical" onFinish={(values) => {
-          setCertificates(prev => prev.filter(c => !selectedRowKeys.includes(c.id)));
-          setSelectedRowKeys([]);
-          setShowTransferModal(false);
-          notification.success({ message: 'Transfer Authorized', description: 'Selected units have been successfully routed.' });
+        <Form layout="vertical" onFinish={async (values) => {
+          setLoading(true);
+          try {
+            await Promise.all(selectedRowKeys.map(certId =>
+              transferCertificateAPI({
+                certificate_id: certId,
+                to_account_id: values.to_account
+              })
+            ));
+            notification.success({ message: 'Transfer Authorized', description: 'Selected units have been successfully routed.' });
+            setSelectedRowKeys([]);
+            setShowTransferModal(false);
+            loadData();
+          } catch (error) {
+            notification.error({ message: 'Transfer Failed', description: error.message });
+          }
+          setLoading(false);
         }}>
           <Form.Item label="Target Account" name="to_account" rules={[{ required: true }]}>
             <Select placeholder="Select participant">
               {accounts.map(a => <Option key={a.id} value={a.id}>{a.account_name}</Option>)}
             </Select>
           </Form.Item>
-          <Button type="primary" block size="large" htmlType="submit">Execute Transfer</Button>
+          <Button type="primary" block size="large" htmlType="submit" loading={loading}>Execute Transfer</Button>
         </Form>
       </Modal>
 
@@ -305,28 +317,28 @@ const Dashboard = ({ activeTab = "1", onTabChange }) => {
         onCancel={() => setShowImportModal(false)}
         footer={null}
       >
-        <Form layout="vertical" onFinish={() => {
-          const newCert = {
-            id: `IMP-${Date.now()}`,
-            issuance_id: `IMP-${Date.now()}`,
-            device_name: "Imported Node",
-            source_type: "solar",
-            period_start: "2025-10-20T00:00:00",
-            period_end: "2025-10-20T01:00:00",
-            production_mwh: 50.0,
-            status: "active"
-          };
-          setCertificates(prev => [newCert, ...prev]);
-          setShowImportModal(false);
-          notification.success({ message: 'Import Successful' });
+        <Form layout="vertical" onFinish={async (values) => {
+          setLoading(true);
+          try {
+            const formData = new FormData();
+            formData.append('file', values.file.file);
+            formData.append('account_id', values.acc);
+            await importCertificatesAPI(formData);
+            notification.success({ message: 'Import Successful' });
+            setShowImportModal(false);
+            loadData();
+          } catch (error) {
+            notification.error({ message: 'Import Failed', description: error.message });
+          }
+          setLoading(false);
         }}>
           <Form.Item label="Target Portfolio" name="acc" rules={[{ required: true }]}>
             <Select>{accounts.map(a => <Option key={a.id} value={a.id}>{a.account_name}</Option>)}</Select>
           </Form.Item>
           <Form.Item label="Registry File" name="file" rules={[{ required: true }]}>
-            <Upload beforeUpload={() => false}><Button icon={<UploadOutlined />}>Select File</Button></Upload>
+            <Upload beforeUpload={() => false} maxCount={1}><Button icon={<UploadOutlined />}>Select File</Button></Upload>
           </Form.Item>
-          <Button type="primary" block size="large" htmlType="submit">Execute Import</Button>
+          <Button type="primary" block size="large" htmlType="submit" loading={loading}>Execute Import</Button>
         </Form>
       </Modal>
 
@@ -336,20 +348,23 @@ const Dashboard = ({ activeTab = "1", onTabChange }) => {
         onCancel={() => setShowCreateModal(false)}
         footer={null}
       >
-        <Form layout="vertical" onFinish={(values) => {
-          const newCert = {
-            id: `CERT-${Date.now()}`,
-            issuance_id: `CERT-${Date.now()}`,
-            device_name: devices.find(d => d.id === values.device_id)?.name || 'New Asset',
-            source_type: values.source_type,
-            period_start: "2025-11-01T00:00:00",
-            period_end: "2025-11-01T01:00:00",
-            production_mwh: parseFloat(values.total_mwh),
-            status: "active"
-          };
-          setCertificates(prev => [newCert, ...prev]);
-          setShowCreateModal(false);
-          notification.success({ message: 'Unit Issued' });
+        <Form layout="vertical" onFinish={async (values) => {
+          setLoading(true);
+          try {
+            await createCertificateAPI({
+              device_id: values.device_id,
+              production_mwh: parseFloat(values.total_mwh),
+              source_type: values.source_type,
+              period_start: "2025-11-01T00:00:00",
+              period_end: "2025-11-01T01:00:00",
+            });
+            notification.success({ message: 'Unit Issued' });
+            setShowCreateModal(false);
+            loadData();
+          } catch (error) {
+            notification.error({ message: 'Issuance Failed', description: error.message });
+          }
+          setLoading(false);
         }}>
           <Form.Item label="Energy Source" name="source_type" rules={[{ required: true }]}>
             <Select><Option value="solar">Solar</Option><Option value="wind">Wind</Option></Select>
@@ -360,7 +375,7 @@ const Dashboard = ({ activeTab = "1", onTabChange }) => {
           <Form.Item label="Originating Asset" name="device_id" rules={[{ required: true }]}>
             <Select>{devices.map(d => <Option key={d.id} value={d.id}>{d.name}</Option>)}</Select>
           </Form.Item>
-          <Button type="primary" block size="large" htmlType="submit">Issue Certificate</Button>
+          <Button type="primary" block size="large" htmlType="submit" loading={loading}>Issue Certificate</Button>
         </Form>
       </Modal>
 
@@ -370,17 +385,28 @@ const Dashboard = ({ activeTab = "1", onTabChange }) => {
         onCancel={() => setShowUploadReadingsModal(false)}
         footer={null}
       >
-        <Form layout="vertical" onFinish={() => {
-          setShowUploadReadingsModal(false);
-          notification.success({ message: 'Telemetry Synchronized', description: 'Initializing Granular Stamping...' });
+        <Form layout="vertical" onFinish={async (values) => {
+          setLoading(true);
+          try {
+            const formData = new FormData();
+            formData.append('file', values.log.file);
+            formData.append('device_id', values.dev);
+            await submitReadingsAPI(formData);
+            notification.success({ message: 'Telemetry Synchronized', description: 'Initializing Granular Stamping...' });
+            setShowUploadReadingsModal(false);
+            loadData();
+          } catch (error) {
+            notification.error({ message: 'Telemetry Sync Failed', description: error.message });
+          }
+          setLoading(false);
         }}>
           <Form.Item label="Asset" name="dev" rules={[{ required: true }]}>
             <Select>{devices.map(d => <Option key={d.id} value={d.id}>{d.name}</Option>)}</Select>
           </Form.Item>
           <Form.Item label="Meter Log (CSV)" name="log" rules={[{ required: true }]}>
-            <Upload beforeUpload={() => false}><Button icon={<UploadOutlined />}>Select Log</Button></Upload>
+            <Upload beforeUpload={() => false} maxCount={1}><Button icon={<UploadOutlined />}>Select Log</Button></Upload>
           </Form.Item>
-          <Button type="primary" block size="large" htmlType="submit">Validate & Submit</Button>
+          <Button type="primary" block size="large" htmlType="submit" loading={loading}>Validate & Submit</Button>
         </Form>
       </Modal>
     </div>

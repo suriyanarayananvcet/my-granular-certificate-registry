@@ -125,7 +125,7 @@ function App() {
             </div>
 
             <div style={{ marginTop: '80px', fontSize: '11px', color: '#8c8c8c' }}>
-              Made by Future Energy Associates Ltd. in partnership with: Private Energy Partners, Google and EnergyTag.
+              Made by <a href="https://futureenergy.associates" target="_blank" rel="noopener noreferrer">Future Energy Associates Ltd.</a> in partnership with: <a href="https://mtstonegate.com" target="_blank" rel="noopener noreferrer">Mt. Stonegate Environmental</a>, Google and EnergyTag.
             </div>
           </div>
         </div>
@@ -184,7 +184,7 @@ function App() {
           <Space size="large">
             <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', lineHeight: '1' }}>
               <Text strong style={{ fontSize: '13px' }}>{user?.name}</Text>
-              <Text type="secondary" style={{ fontSize: '11px' }}>{user?.organisation}</Text>
+              <a href="https://mtstonegate.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: '11px', color: '#8c8c8c' }}>{user?.organisation}</a>
             </div>
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
               <Avatar
