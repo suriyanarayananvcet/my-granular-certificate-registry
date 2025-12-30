@@ -35,17 +35,15 @@ class Settings(BaseSettings):
     CORS_ALLOWED_ORIGINS: str = ""
 
     @property
-    def database_url(self) -> str:
-        """Build database URL from components if DATABASE_URL is not set."""
-        if self.DATABASE_URL:
-            return self.DATABASE_URL
-        elif self.DATABASE_PRIVATE_URL:
-            return self.DATABASE_PRIVATE_URL
-        elif self.POSTGRES_URL:
-            return self.POSTGRES_URL
-        else:
-            # Build from individual components
-            return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+    def cors_origins(self) -> list[str]:
+        """Parse CORS origins into a clean list."""
+        if not self.CORS_ALLOWED_ORIGINS:
+            return []
+        return [
+            o.strip().strip("'\"").rstrip("/") 
+            for o in self.CORS_ALLOWED_ORIGINS.split(",") 
+            if o.strip()
+        ]
         """Parse CORS origins into a clean list."""
         if not self.CORS_ALLOWED_ORIGINS:
             return []
