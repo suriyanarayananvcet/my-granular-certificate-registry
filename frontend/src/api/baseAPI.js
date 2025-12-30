@@ -14,7 +14,7 @@ import {
 } from "./completeMockAPI";
 
 // Enable demo mode when backend is unavailable
-const DEMO_MODE = true;
+const DEMO_MODE = false;
 
 const AUTH_LIST = ["/auth/login"];
 const CSRF_EXEMPT = ["/csrf-token"];
