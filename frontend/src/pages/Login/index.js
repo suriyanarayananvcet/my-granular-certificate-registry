@@ -74,6 +74,8 @@ const Login = () => {
                   <Text>Email</Text>
                 </div>
                 <Input
+                  id="email"
+                  name="email"
                   placeholder="Email"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -99,6 +101,8 @@ const Login = () => {
                   </Link>
                 </div>
                 <Input.Password
+                  id="password"
+                  name="password"
                   placeholder="Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
