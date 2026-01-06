@@ -35,7 +35,29 @@ const fetchCSRFToken = async () => {
 // Override axios for demo mode
 if (DEMO_MODE) {
   baseAPI.interceptors.request.use((config) => {
-    // Block all real API calls in demo mode
+    // Return mock responses immediately for demo mode
+    const url = config.url;
+    
+    if (url?.includes("/auth/login")) {
+      return Promise.resolve({ data: mockLogin().data });
+    }
+    if (url?.includes("/user/me")) {
+      return Promise.resolve({ data: mockUserMe().data });
+    }
+    if (url?.includes("/certificate")) {
+      return Promise.resolve({ data: mockCertificates().data });
+    }
+    if (url?.includes("/account")) {
+      return Promise.resolve({ data: mockAccounts().data });
+    }
+    if (url?.includes("/device")) {
+      return Promise.resolve({ data: mockDevices().data });
+    }
+    if (url?.includes("/storage")) {
+      return Promise.resolve({ data: mockStorageRecords().data });
+    }
+    
+    // Block other requests
     return Promise.reject({
       code: 'DEMO_MODE',
       config: config,
