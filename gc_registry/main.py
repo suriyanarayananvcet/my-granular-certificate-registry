@@ -88,7 +88,7 @@ origins = [
 origins.extend(settings.cors_origins)
 
 # Absolute fallback for this specific Vercel deployment to stop CORS errors
-vercel_origin = "https://mt-stonegate.vercel.app"
+vercel_origin = "https://my-granular-certificate-registry-n6t50x4mi.vercel.app"
 if vercel_origin not in origins:
     origins.append(vercel_origin)
 
