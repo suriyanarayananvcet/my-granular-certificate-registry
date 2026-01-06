@@ -85,9 +85,9 @@ baseAPI.interceptors.response.use(
     const url = error.config?.url;
     const isDemo = isDemoEnabled();
 
-    // Demo mode fallback for network errors only
-    if (isDemo && error.code === "ERR_NETWORK") {
-      console.log(`Demo Mode: Intercepted ${error.response?.status || 'Network'} error for ${url}. Returning mock data.`);
+    // Demo mode fallback for all errors
+    if (isDemo && (error.code === "ERR_NETWORK" || error.code === "DEMO_MODE" || error.code?.includes("ERR_"))) {
+      console.log(`Demo Mode: Intercepted ${error.code || error.response?.status || 'Network'} error for ${url}. Returning mock data.`);
 
       if (url?.includes("/auth/login")) return mockLogin();
       if (url?.includes("/certificate")) return mockCertificates();
